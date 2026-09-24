@@ -1,0 +1,908 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<meta name="theme-color" content="#0b0e14"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black"/>
+<meta name="apple-mobile-web-app-title" content="F&amp;O Screener"/>
+<meta name="description" content="Live NSE F&amp;O screener — filters all 210 F&O stocks down to the best few, with entry, stop and targets."/>
+<link rel="manifest" href="/manifest.json"/>
+<link rel="apple-touch-icon" href="/apple-touch-icon.png"/>
+<link rel="icon" href="/icon-192.png"/>
+<title>F&amp;O Live Screener</title>
+<style>
+  :root{
+    --bg:#0b0e14; --bg2:#111725; --card:#141b2b; --card2:#1a2337; --line:#232d45;
+    --txt:#e8edf7; --dim:#8b98b4; --dim2:#5f6d8c;
+    --up:#22c55e; --updim:#0f3d26; --dn:#ef4444; --dndim:#43181b;
+    --acc:#4f8cff; --warn:#f59e0b; --violet:#a78bfa;
+    --r:14px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--txt);
+    font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased}
+  a{color:var(--acc)}
+  .wrap{max-width:1380px;margin:0 auto;padding:14px 16px 60px}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  .dim{color:var(--dim)} .dim2{color:var(--dim2)}
+  .up{color:var(--up)} .dn{color:var(--dn)} .wn{color:var(--warn)}
+
+  /* ---------- header ---------- */
+  header{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:12px}
+  .brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:17px;letter-spacing:.2px}
+  .logo{width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,#4f8cff,#a78bfa);
+    display:grid;place-items:center;font-size:15px}
+  .spacer{flex:1}
+  .pill{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;
+    font-size:12px;font-weight:600;border:1px solid var(--line);background:var(--card)}
+  .pill.live{border-color:#1d5c3a;background:#0f2e20;color:#4ade80}
+  .pill.live .dot{width:7px;height:7px;border-radius:50%;background:#22c55e;animation:blink 1.6s infinite}
+  .pill.demo{border-color:#6b4d12;background:#2b2109;color:#fbbf24}
+  .pill.closed{border-color:var(--line);color:var(--dim)}
+  @keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
+  button{font:inherit;cursor:pointer;border-radius:10px;border:1px solid var(--line);
+    background:var(--card);color:var(--txt);padding:7px 12px;transition:.15s}
+  button:hover{background:var(--card2);border-color:#33415f}
+  button.primary{background:linear-gradient(135deg,#3b7cf6,#6d8fff);border:none;color:#fff;font-weight:600}
+  button.ghost{background:transparent}
+  button:disabled{opacity:.5;cursor:not-allowed}
+
+  /* ---------- market strip ---------- */
+  .strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:10px;margin-bottom:12px}
+  .tile{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:10px 12px}
+  .tile .k{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.6px}
+  .tile .v{font-size:17px;font-weight:700;margin-top:3px}
+  .tile .s{font-size:12px;margin-top:2px}
+  .regime{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--card);
+    border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;margin-bottom:12px}
+  .regime .tag{font-weight:700;padding:3px 10px;border-radius:8px;font-size:12px}
+  .tag.riskOn{background:#0f3d26;color:#4ade80;border:1px solid #1d5c3a}
+  .tag.riskOff{background:#43181b;color:#fca5a5;border:1px solid #7f2226}
+  .tag.chop{background:#2c2a12;color:#fcd34d;border:1px solid #6b5a12}
+  .breadth{flex:1;min-width:180px;max-width:340px}
+  .bar{height:7px;border-radius:99px;background:var(--dndim);overflow:hidden;display:flex}
+  .bar .g{background:linear-gradient(90deg,#16a34a,#22c55e);height:100%}
+  .bar .r{background:linear-gradient(90deg,#dc2626,#ef4444);height:100%}
+
+  /* ---------- funnel ---------- */
+  .funnel{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--bg2);
+    border:1px solid var(--line);border-radius:var(--r);padding:9px 12px;margin-bottom:14px;font-size:12.5px}
+  .fstep{display:flex;align-items:center;gap:7px;padding:3px 9px;border-radius:8px;background:var(--card)}
+  .fstep b{font-size:14px}
+  .farrow{color:var(--dim2)}
+
+  /* ---------- tabs ---------- */
+  .tabs{display:flex;gap:6px;margin-bottom:14px;border-bottom:1px solid var(--line);padding-bottom:0}
+  .tab{padding:9px 14px;border-radius:10px 10px 0 0;font-weight:600;color:var(--dim);cursor:pointer;
+    border:1px solid transparent;border-bottom:none;font-size:13.5px}
+  .tab.on{color:var(--txt);background:var(--card);border-color:var(--line)}
+  .pane{display:none} .pane.on{display:block}
+
+  /* ---------- picks ---------- */
+  .sect{margin-bottom:22px}
+  .sect h2{font-size:14px;margin:0 0 10px;letter-spacing:.4px;text-transform:uppercase;display:flex;
+    align-items:center;gap:8px}
+  .sect h2 .cnt{color:var(--dim);font-weight:500;text-transform:none;letter-spacing:0}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:13px 14px;
+    position:relative;overflow:hidden}
+  .card.long{border-left:3px solid var(--up)} .card.short{border-left:3px solid var(--dn)}
+  .card .top{display:flex;align-items:flex-start;gap:10px}
+  .rank{width:22px;height:22px;border-radius:7px;background:var(--card2);display:grid;place-items:center;
+    font-size:11.5px;font-weight:700;color:var(--dim);flex:none;margin-top:2px}
+  .sym{font-size:16.5px;font-weight:700;letter-spacing:.2px;line-height:1.15}
+  .sub{font-size:11.5px;color:var(--dim);margin-top:1px}
+  .score{margin-left:auto;text-align:right;flex:none}
+  .score .n{font-size:20px;font-weight:800;line-height:1}
+  .score .l{font-size:10px;color:var(--dim);letter-spacing:.5px;text-transform:uppercase}
+  .px{display:flex;align-items:baseline;gap:9px;margin:9px 0 4px;flex-wrap:wrap}
+  .px .now{font-size:19px;font-weight:700}
+  .chg{font-weight:600;font-size:13px}
+  .vs{font-size:11.5px;color:var(--dim)}
+  .spark{margin:6px 0 9px;height:38px}
+  .lvl{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:9px}
+  .lvl div{background:var(--bg2);border:1px solid var(--line);border-radius:9px;padding:6px 8px}
+  .lvl .k{font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px}
+  .lvl .v{font-size:13.5px;font-weight:700;margin-top:1px}
+  .lvl .entry .v{color:var(--acc)} .lvl .sl .v{color:var(--dn)} .lvl .t .v{color:var(--up)}
+  .meta{display:flex;gap:10px;flex-wrap:wrap;font-size:11.5px;color:var(--dim);margin-bottom:8px}
+  .meta b{color:var(--txt);font-weight:600}
+  ul.why{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:4px}
+  ul.why li{font-size:12.5px;display:flex;gap:7px;align-items:flex-start}
+  ul.why li .b{color:var(--up);flex:none;font-size:11px;line-height:1.5}
+  .card.short ul.why li .b{color:var(--dn)}
+  .risk{margin-top:7px;font-size:11.5px;color:#fbbf24;display:flex;flex-wrap:wrap;gap:8px}
+  .foot{display:flex;align-items:center;gap:8px;margin-top:10px;padding-top:9px;border-top:1px dashed var(--line);
+    font-size:11px;color:var(--dim2);flex-wrap:wrap}
+  .badge{padding:2px 7px;border-radius:6px;font-size:10.5px;font-weight:700;letter-spacing:.3px}
+  .b-WATCH{background:#222c44;color:#93a4c6} .b-WORKING{background:#0f2f4d;color:#7dd3fc}
+  .b-RUNNING{background:#0f3d26;color:#4ade80} .b-FADING{background:#3a2d0d;color:#fcd34d}
+  .b-STOPPED{background:#43181b;color:#fca5a5}
+  .new{background:#2b1f4d;color:#c4b5fd}
+  .empty{background:var(--card);border:1px dashed var(--line);border-radius:var(--r);padding:22px;text-align:center;color:var(--dim)}
+
+  /* ---------- table ---------- */
+  .tbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+  input[type=text],input[type=number],input[type=password],textarea{background:var(--bg2);border:1px solid var(--line);
+    color:var(--txt);border-radius:9px;padding:8px 10px;font:inherit;width:100%}
+  .tbar input[type=text]{max-width:260px}
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  th,td{padding:7px 9px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+  th:first-child,td:first-child,th:nth-child(2),td:nth-child(2){text-align:left}
+  th{position:sticky;top:0;background:var(--bg2);cursor:pointer;color:var(--dim);font-size:11px;
+    text-transform:uppercase;letter-spacing:.5px;z-index:2}
+  th:hover{color:var(--txt)}
+  tbody tr:hover{background:#161f31}
+  .tblwrap{max-height:70vh;overflow:auto;border:1px solid var(--line);border-radius:var(--r);background:var(--card)}
+  .g-pass{color:#4ade80} .g-illiquid,.g-low-volatility,.g-wide-spread,.g-price-floor{color:var(--dim2)}
+  .g-ban-list{color:#fca5a5}
+  .sch{display:inline-block;min-width:34px;padding:2px 6px;border-radius:6px;font-weight:700;font-size:11.5px}
+  .sch.hi{background:#0f3d26;color:#4ade80} .sch.md{background:#2c2a12;color:#fcd34d}
+  .sch.lo{background:#1c2333;color:var(--dim)}
+  .sch.hir{background:#43181b;color:#fca5a5}
+
+  /* ---------- docs ---------- */
+  .doc{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:16px 18px}
+  .doc h3{margin:16px 0 6px;font-size:14px} .doc h3:first-child{margin-top:0}
+  .doc p,.doc li{font-size:13px;color:#c9d3e6}
+  .doc code{background:var(--bg2);padding:1px 6px;border-radius:6px;font-size:12px}
+  .doc ol,.doc ul{padding-left:20px}
+
+  /* ---------- drawer ---------- */
+  .scrim{position:fixed;inset:0;background:rgba(5,8,14,.65);display:none;z-index:40}
+  .scrim.on{display:block}
+  .drawer{position:fixed;top:0;right:0;height:100%;width:min(430px,94vw);background:var(--bg2);
+    border-left:1px solid var(--line);z-index:41;transform:translateX(102%);transition:.22s;overflow:auto;padding:16px}
+  .drawer.on{transform:none}
+  .frow{margin-bottom:12px} .frow label{display:block;font-size:12px;color:var(--dim);margin-bottom:5px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .note{font-size:11.5px;color:var(--dim2);margin-top:6px}
+  .banner{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-radius:var(--r);margin-bottom:12px;font-size:13px}
+  .banner.warn{background:#2b2109;border:1px solid #6b4d12;color:#fde68a}
+  .banner.err{background:#3a1416;border:1px solid #7f2226;color:#fecaca}
+  .banner.info{background:#101c33;border:1px solid #26406b;color:#cfe0ff}
+  .connect{display:flex;flex-direction:column;gap:10px}
+  .cstep{display:flex;gap:10px;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:11px}
+  .cstep .n{width:22px;height:22px;flex:none;border-radius:7px;background:var(--card2);display:grid;
+    place-items:center;font-size:12px;font-weight:700;color:var(--dim)}
+  .cbody{flex:1;min-width:0} .cbody b{font-size:13px}
+  .row{display:flex;gap:7px;margin-top:8px;align-items:center;flex-wrap:wrap}
+  .row input{flex:1;min-width:130px}
+  .copyrow{display:flex;gap:6px;align-items:center}
+  .copyrow code{flex:1;background:var(--bg2);border:1px solid var(--line);border-radius:8px;padding:6px 9px;
+    font-size:11.5px;word-break:break-all;font-family:ui-monospace,Menlo,Consolas,monospace}
+  button.mini{padding:5px 9px;font-size:11.5px}
+  a.btnlink{display:inline-block;background:linear-gradient(135deg,#3b7cf6,#6d8fff);color:#fff;text-decoration:none;
+    padding:8px 14px;border-radius:10px;font-weight:600;font-size:13px}
+  a.btnlink.off{background:var(--card);color:var(--dim2);border:1px solid var(--line);pointer-events:none}
+  .okline{color:#4ade80} .badline{color:#fca5a5}
+  .ready{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:9px 0 2px;padding:8px 10px;
+    border-radius:10px;border:1px solid var(--line);background:var(--bg2)}
+  .ready .v{font-weight:800;font-size:11.5px;letter-spacing:.6px;padding:3px 9px;border-radius:7px;flex:none}
+  .v-READY{background:#0f3d26;color:#4ade80;border:1px solid #1d5c3a}
+  .v-WAIT{background:#3a2d0d;color:#fcd34d;border:1px solid #6b5a12}
+  .v-LATE{background:#3a1f0d;color:#fdba74;border:1px solid #7c4a1a}
+  .v-SKIP{background:#222c44;color:#93a4c6;border:1px solid #33415f}
+  .v-NEXTSESSION{background:#1c2333;color:#8b98b4;border:1px solid #2b3853}
+  .ready .r{font-size:12px;color:#c9d3e6;flex:1;min-width:150px}
+  .checks{display:none;margin-top:8px;border-top:1px dashed var(--line);padding-top:8px}
+  .card.open .checks{display:block}
+  .chk{display:flex;gap:7px;font-size:11.5px;padding:2px 0}
+  .chk .i{flex:none;width:13px} .chk.ok{color:#9fb3d1} .chk.no{color:#e0b070}
+  .phasebar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--card);
+    border:1px solid var(--line);border-radius:var(--r);padding:9px 12px;margin-bottom:12px}
+  .phasebar .pl{font-weight:800;font-size:12px;padding:3px 10px;border-radius:7px}
+  .pl-Prime{background:#0f3d26;color:#4ade80} .pl-Good{background:#12324d;color:#7dd3fc}
+  .pl-Choppy{background:#3a2d0d;color:#fcd34d} .pl-Manage{background:#3a1f0d;color:#fdba74}
+  .pl-Avoid,.pl-Exit,.pl-Closed{background:#222c44;color:#93a4c6}
+  .timeline{flex:1;min-width:200px;height:6px;border-radius:99px;background:var(--bg2);display:flex;overflow:hidden;border:1px solid var(--line)}
+  .timeline i{height:100%}
+  .stab{display:flex;gap:8px;flex-wrap:wrap;font-size:11px;color:var(--dim2);margin-top:6px}
+  .stab b{color:var(--dim);font-weight:600}
+  .copyplan{margin-left:auto}
+  .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--card2);
+    border:1px solid var(--line);padding:10px 16px;border-radius:12px;z-index:60;display:none;font-size:13px}
+  /* mobile: respect iPhone notch/home bar, bigger tap targets, no accidental zoom */
+  body{padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}
+  .wrap{padding-left:max(12px, env(safe-area-inset-left));padding-right:max(12px, env(safe-area-inset-right))}
+  button,a.btnlink,label{ -webkit-tap-highlight-color:transparent; touch-action:manipulation }
+  .tab{padding:10px 12px}
+  @media(max-width:700px){
+    .lvl{grid-template-columns:repeat(2,1fr)}
+    .grid{grid-template-columns:1fr}
+    .wrap{padding:10px 10px 70px}
+    .tile .v{font-size:15px}
+    header{gap:8px}
+    #btnRefresh,#btnSettings{padding:8px 11px}
+    .tab{font-size:12.5px;padding:9px 10px}
+    .checks .chk{font-size:11px}
+    .strip{grid-template-columns:repeat(2,1fr)}
+    .funnel{font-size:11.5px}
+    .phasebar{gap:7px}
+    .tblwrap{max-height:65vh}
+    .stab{gap:6px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand"><div class="logo">⚡</div> F&amp;O Live Screener</div>
+    <span id="modePill" class="pill">starting…</span>
+    <span id="mktPill" class="pill closed">market</span>
+    <span id="clock" class="pill mono">--:--:--</span>
+    <div class="spacer"></div>
+    <span id="nextUpd" class="dim" style="font-size:12px"></span>
+    <button id="btnRefresh" class="ghost">⟳ Refresh</button>
+    <button id="btnSettings">⚙ Settings</button>
+  </header>
+
+  <div id="banners"></div>
+
+  <div class="strip">
+    <div class="tile"><div class="k">NIFTY 50</div><div class="v" id="niftyV">—</div><div class="s" id="niftyS">—</div></div>
+    <div class="tile"><div class="k">BANK NIFTY</div><div class="v" id="bankV">—</div><div class="s" id="bankS">—</div></div>
+    <div class="tile"><div class="k">INDIA VIX</div><div class="v" id="vixV">—</div><div class="s" id="vixS">—</div></div>
+    <div class="tile"><div class="k">Market Breadth</div><div class="v" id="brV">—</div><div class="s" id="brS">—</div></div>
+    <div class="tile"><div class="k">Stocks Scanned</div><div class="v" id="scanV">—</div><div class="s" id="scanS">—</div></div>
+  </div>
+
+  <div class="regime">
+    <span id="regimeTag" class="tag chop">—</span>
+    <span id="regimeNote" class="dim" style="font-size:12.5px">—</span>
+    <div class="spacer"></div>
+    <div class="breadth">
+      <div class="bar" id="brBar"><div class="g" style="width:50%"></div><div class="r" style="width:50%"></div></div>
+    </div>
+    <span id="sectorTop" class="dim" style="font-size:12px"></span>
+  </div>
+
+  <div class="phasebar" id="phasebar"></div>
+
+  <div class="funnel" id="funnel"></div>
+
+  <div class="tabs">
+    <div class="tab on" data-pane="picks">🎯 Top Picks</div>
+    <div class="tab" data-pane="all">📋 All F&amp;O Stocks</div>
+    <div class="tab" data-pane="playbook">📗 How to trade it</div>
+    <div class="tab" data-pane="how">📘 Behind the scenes</div>
+  </div>
+
+  <div class="pane on" id="pane-picks">
+    <div class="tbar">
+      <label class="dim" style="font-size:12.5px"><input type="checkbox" id="onlyReady" style="width:auto">
+        show only <b>actionable</b> (READY) picks</label>
+      <span class="dim" style="font-size:12px" id="readyHint"></span>
+    </div>
+    <div class="sect">
+      <h2>▲ Top Longs <span class="cnt" id="cntLong"></span></h2>
+      <div class="grid" id="gridLong"></div>
+    </div>
+    <div class="sect">
+      <h2>▼ Top Shorts <span class="cnt" id="cntShort"></span></h2>
+      <div class="grid" id="gridShort"></div>
+    </div>
+  </div>
+
+  <div class="pane" id="pane-all">
+    <div class="tbar">
+      <input type="text" id="q" placeholder="Search symbol or sector…"/>
+      <label class="dim" style="font-size:12.5px"><input type="checkbox" id="onlyTrade" style="width:auto"> only tradeable</label>
+      <label class="dim" style="font-size:12.5px"><input type="checkbox" id="onlyScored" style="width:auto"> only scored</label>
+      <span class="dim" id="rowCount" style="font-size:12.5px"></span>
+    </div>
+    <div class="tblwrap">
+      <table id="tbl">
+        <thead><tr>
+          <th data-k="symbol">Symbol</th><th data-k="sector">Sector</th><th data-k="ltp">LTP</th>
+          <th data-k="pct_chg">Chg %</th><th data-k="rvol">RVOL</th><th data-k="oi_chg">OI Δ%</th>
+          <th data-k="turnover_cr">Turnover ₹cr</th><th data-k="atr_pct">ATR%</th>
+          <th data-k="score_long">Long</th><th data-k="score_short">Short</th><th data-k="gate">Gate</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="pane" id="pane-playbook">
+    <div class="doc">
+      <h3>Read this once, then follow the chips</h3>
+      <p>Every card carries a verdict button — <b>READY</b>, <b>WAIT</b>, <b>LATE</b>, <b>SKIP</b> — computed from the
+      score, volume pace, VWAP position, how extended the move is, how long the pick has held, whether price is still
+      near the entry, the market regime and the time of day. <b>Only READY means act.</b> Tap the verdict to see the
+      eight checks behind it.</p>
+
+      <h3>1 · When to trade (the phase bar)</h3>
+      <ul>
+        <li><b>09:15–09:30 Avoid</b> — opening range is forming. Read the list, trade nothing.</li>
+        <li><b>09:30–10:15 Prime</b> — the best window for BREAKOUT / BREAKDOWN entries. Volume is real, ranges are set.</li>
+        <li><b>10:15–11:30 Good</b> — trend continuation. BUY NOW / pullback entries work.</li>
+        <li><b>11:30–13:30 Choppy</b> — lunchtime. Only A+ setups, expect false breakouts.</li>
+        <li><b>13:30–14:45 Prime</b> — the afternoon move often decides the day. Fresh breakouts are tradeable.</li>
+        <li><b>14:45–15:15 Manage</b> — no new trades. Trail stops, bank profits.</li>
+        <li><b>15:15–15:30 Exit</b> — square off. F&amp;O intraday positions must be closed.</li>
+      </ul>
+
+      <h3>2 · Which stock, when two look equally good</h3>
+      <ol>
+        <li><b>Highest score wins</b> — but only if it is READY.</li>
+        <li><b>Stability beats freshness.</b> A pick that has held its place for 20+ minutes, with a steady or rising score
+            and a good <i>best rank</i>, is far more trustworthy than one that just appeared. Fresh picks are marked.</li>
+        <li><b>Prefer same-direction as the market.</b> On a Risk-Off day, the best short beats the best long.</li>
+        <li><b>Prefer the sector that's moving.</b> Look at the strongest/weakest sectors in the header — a stock riding its
+            sector has a tailwind.</li>
+        <li><b>Prefer real build-up over covering.</b> "Fresh long/short build-up (OI up with price)" keeps going.
+            "Short covering" rallies fade.</li>
+        <li><b>Take one, not five.</b> If two picks are in the same sector, they will behave alike — you'd just be doubling risk.</li>
+      </ol>
+
+      <h3>3 · How to enter (never chase)</h3>
+      <ul>
+        <li>Use the <b>Entry</b> box and the mode line:
+          <b>BREAKOUT</b> = buy strength above the day high · <b>BUY NOW</b> = price is just above VWAP support ·
+          <b>BUY DIP</b> = wait for the pullback to the entry zone · <b>RECLAIM</b> = only after it gets back above VWAP.</li>
+        <li>If price is already more than <b>0.6R past the entry</b>, the card says <b>LATE</b> — don't chase it, wait for a
+            pullback to the entry zone.</li>
+        <li>If the price never reaches your entry zone, you take <b>no trade</b>. Missing a move costs nothing.</li>
+        <li>Place the stop <b>at the same time</b> as the entry. The stop is structural, not a suggestion.</li>
+      </ul>
+
+      <h3>4 · How to exit</h3>
+      <ul>
+        <li>At <b>T1</b>: book half, and move the stop to breakeven (the app tracks this as WORKING → RUNNING).</li>
+        <li>At <b>T2</b>: book the rest, or trail the stop under each new 5-minute higher low / above each lower high.</li>
+        <li><b>Stop = exit.</b> No averaging down, no "it'll come back". The status flips to STOPPED and the pick is done.</li>
+        <li><b>Time stop:</b> if it hasn't reached T1 within ~45–60 minutes and volume is fading, take what's there and go.</li>
+        <li>If the card flips to <b>FADING</b> or the score drops hard for 2–3 refreshes, tighten up or exit.</li>
+      </ul>
+
+      <h3>5 · Position sizing (the part that keeps you alive)</h3>
+      <p>Each card shows <b>risk per lot</b> in ₹. Decide the most you're willing to lose on one trade — say ₹5,000 —
+      then <code>lots = 5000 ÷ risk_per_lot</code>. Round <b>down</b>. Two trades a day maximum, and if the first two lose,
+      stop for the day.</p>
+
+      <h3>6 · Why the list keeps changing (and what to do about it)</h3>
+      <p>Scores are a live read of momentum, so names will shuffle as the tape moves — that's normal. The discipline is:</p>
+      <ul>
+        <li><b>Don't re-pick every refresh.</b> <span class="wn">Decide once per phase</span>: pick your 1–2 names in the
+            09:30–10:15 window (and again after 13:30). Between those windows, only manage what you hold.</li>
+        <li><b>A pick that disappears is information</b>, not a trade signal. Something better replaced it, or its momentum
+            died — either way, you don't chase the newcomer mid-move.</li>
+        <li><b>Ignore anything marked fresh</b> unless it is also READY for 2+ refreshes in a row.</li>
+        <li><b>Don't flip sides casually.</b> If the regime bar says Risk-Off and you're holding a long that still shows
+            READY, you can keep it — but stop opening new longs.</li>
+      </ul>
+
+      <h3>7 · A day in practice</h3>
+      <ol>
+        <li>09:10 — token pasted, warm-up done before the bell. Read the regime and sector leaders.</li>
+        <li>09:30 — open the Top Picks tab, tick <b>actionable only</b>. Read the READY cards' eight checks.</li>
+        <li>09:35 — take at most one; enter only in the stated zone; stop on immediately.</li>
+        <li>10:30 — if it's at T1, book half and trail. If it's FADING with no volume, exit flat.</li>
+        <li>13:30 — second look: only if you're flat and something is READY.</li>
+        <li>14:45 — stop trading. Manage or exit. </li>
+        <li>15:10 — everything closed. Skim <code>logs/live/picks_*.csv</code> to see how your picks actually did.</li>
+      </ol>
+      <p class="note">Educational tool, not investment advice. Paper-trade this routine for a few sessions before risking money.</p>
+    </div>
+  </div>
+
+  <div class="pane" id="pane-how">
+    <div class="doc">
+      <h3>What this does</h3>
+      <p>Every refresh cycle it pulls live quotes for <b>all 210 NSE stock-F&amp;O underlyings</b> (plus their futures for
+      open-interest), then runs a two-stage funnel so you only ever look at the 4–5 best ideas on each side.</p>
+      <h3>The funnel</h3>
+      <ol>
+        <li><b>Snapshot</b> — one batch call for all 210 stocks: price, change, day range position, volume, open interest, bid/ask, circuits.</li>
+        <li><b>Pre-score</b> — every stock is scored cheaply on relative strength vs NIFTY, range position, volume pace (RVOL), OI build-up and where it sits versus yesterday's high/low.</li>
+        <li><b>Deep scan</b> — the top candidates get 1-minute candles so the engine can compute day VWAP, opening-range breakouts, 5-min EMA slope, RSI and volume bursts.</li>
+        <li><b>Hard gates</b> — thrown out if liquidity (pace-adjusted turnover), spread, ATR, price, or circuit proximity is wrong, or the stock is on your ban list.</li>
+        <li><b>Final score</b> — weighted composite; top 5 longs + top 5 shorts published, max 2 per sector so you don't get five banks.</li>
+      </ol>
+      <h3>Score weights</h3>
+      <p>Relative strength 22% · momentum &amp; intraday structure 20% · level/breakout structure 18% · volume confirmation 13%
+      · open-interest build-up 12% · trade setup quality (R:R, stop width) 10% · market + sector alignment 5%.</p>
+      <p>Penalties: extended far from VWAP, near circuit, wide spread, rally driven only by short covering.</p>
+      <h3>Trade plan on each card</h3>
+      <ul>
+        <li><b>Entry</b> — either a breakout level, the current price just above VWAP support, or a pullback zone. The card says which.</li>
+        <li><b>Stop loss</b> — the tightest sensible structural level (below VWAP / opening range / day low), floored so it isn't noise-width.</li>
+        <li><b>T1 / T2</b> — 1R and 2R, snapped to real levels (yesterday's high/low, 20-day breakout) when they are closer.</li>
+        <li><b>Risk per lot</b> — stop distance × lot size, so you can size the position without mental maths.</li>
+      </ul>
+      <h3>The market regime switch</h3>
+      <p>The header shows whether the tape is Risk-On, Risk-Off or Chop from index trend, breadth and VWAP position.
+      The favoured side needs a lower score to qualify; the other side is held to a higher bar automatically.</p>
+      <h3>Practical notes</h3>
+      <ul>
+        <li>Picks are intraday ideas for the current session — exit before 15:15–15:30 IST unless you are deliberately carrying.</li>
+        <li>This trades futures (F&amp;O); the futures contract and lot size are on every card. Margins apply.</li>
+        <li>Your access token expires daily (~3:30 AM IST). Paste a fresh one in Settings each morning.</li>
+        <li>Educational/analysis tool, not investment advice. Test it on paper first.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div class="scrim" id="scrim"></div>
+<div class="drawer" id="drawer">
+  <div style="display:flex;align-items:center;margin-bottom:14px">
+    <b style="font-size:15px">⚙ Settings</b><div class="spacer"></div>
+    <button class="ghost" id="btnCloseDrawer">✕</button>
+  </div>
+
+  <div class="frow">
+    <label>Connect Upstox (live data)</label>
+    <div class="connect">
+      <div class="cstep">
+        <div class="n">1</div>
+        <div class="cbody">
+          <b>Easiest — copy a token</b>
+          <div class="note">Open <a href="https://account.upstox.com/developer/apps" target="_blank" rel="noopener">account.upstox.com/developer/apps</a>,
+          click <b>Generate</b> next to your app, then paste the token here. No redirect URL needed.</div>
+          <div class="row">
+            <input type="password" id="tok" placeholder="paste today's access token"/>
+            <button class="primary" id="btnSaveToken">Go live</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="cstep">
+        <div class="n">2</div>
+        <div class="cbody">
+          <b>One-click login (optional)</b>
+          <div class="note">Add your API key + secret to get a <b>Login with Upstox</b> button instead of copying tokens daily.
+            Find them on your app's page ("API key" and "API secret").</div>
+          <div class="row">
+            <input type="password" id="ckey" placeholder="API key (client id)"/>
+            <input type="password" id="csecret" placeholder="API secret"/>
+            <button id="btnSaveCreds">Save</button>
+          </div>
+          <div class="note" id="redirectBox" style="margin-top:10px">
+            <div style="margin-bottom:4px">Register this as your app's <b>Redirect URI</b> (must match exactly):</div>
+            <div class="copyrow"><code id="redir">http://localhost:8000/callback</code><button class="mini" data-copy="redir">copy</button></div>
+            <div class="note" id="redirAlt"></div>
+          </div>
+          <div class="row" style="margin-top:10px">
+            <a id="loginLink" class="btnlink" href="#" target="_blank" rel="noopener">Login with Upstox →</a>
+            <button id="btnCopyLogin" class="mini">copy login link</button>
+          </div>
+          <div class="row" style="margin-top:8px">
+            <input type="text" id="authcode" placeholder="…or paste the code / the whole redirect URL here"/>
+            <button id="btnAuthCode">Finish login</button>
+          </div>
+          <div class="note" id="authStatus"></div>
+        </div>
+      </div>
+    </div>
+    <div class="note" style="margin-top:10px">Tokens expire daily around 3:30 AM IST — that's an Upstox rule.
+      Everything is stored only on this machine (<code>runtime/</code>) and sent nowhere but api.upstox.com.</div>
+    <button id="btnDemo" style="margin-top:8px;width:100%">Use demo data instead</button>
+  </div>
+
+  <hr style="border:none;border-top:1px solid var(--line);margin:16px 0">
+
+  <div class="frow grid2">
+    <div><label>Refresh every (sec)</label><input type="number" id="s_refresh" min="5" max="120" step="1"></div>
+    <div><label>Deep-scan depth</label><input type="number" id="s_depth" min="5" max="120" step="5"></div>
+  </div>
+  <div class="frow grid2">
+    <div><label>Min turnover ₹cr (full day)</label><input type="number" id="s_turn" step="5"></div>
+    <div><label>Max spread %</label><input type="number" id="s_spread" step="0.02"></div>
+  </div>
+  <div class="frow grid2">
+    <div><label>Min ATR % (daily)</label><input type="number" id="s_atr" step="0.1"></div>
+    <div><label>Min price ₹</label><input type="number" id="s_price" step="5"></div>
+  </div>
+  <div class="frow grid2">
+    <div><label>Picks per side</label><input type="number" id="s_picks" min="1" max="10" step="1"></div>
+    <div><label>Max per sector</label><input type="number" id="s_sector" min="1" max="5" step="1"></div>
+  </div>
+  <div class="frow"><label>Minimum score to publish</label><input type="number" id="s_floor" step="1"></div>
+  <div class="frow grid2">
+    <div><label><input type="checkbox" id="s_longs" style="width:auto"> show longs</label></div>
+    <div><label><input type="checkbox" id="s_shorts" style="width:auto"> show shorts</label></div>
+  </div>
+  <div class="frow">
+    <label>F&amp;O ban-list symbols (comma separated)</label>
+    <textarea id="s_ban" rows="2" placeholder="e.g. IDEA, INDUSINDBK"></textarea>
+  </div>
+  <button class="primary" id="btnSaveSettings" style="width:100%">Save settings</button>
+  <div class="frow" style="margin-top:14px">
+    <button id="btnRebuild" style="width:100%">⟲ Rebuild F&amp;O list from Upstox</button>
+    <div class="note">Re-downloads the instrument master — use when new stocks enter F&amp;O.</div>
+  </div>
+  <div class="frow" style="margin-top:14px">
+    <label>Status</label>
+    <div class="note" id="statBox"></div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const S = {data:null, sortK:'score_long', sortDir:-1, timer:null, countdown:0};
+const $ = id => document.getElementById(id);
+const fmt = (n,d=2) => (n===null||n===undefined||isNaN(n)) ? '—'
+  : Number(n).toLocaleString('en-IN',{minimumFractionDigits:d,maximumFractionDigits:d});
+const money = n => (n===null||n===undefined||isNaN(n)) ? '—' : '₹' + fmt(n,2);
+const sgn = n => (n>0?'+':'') + fmt(n,2);
+const cls = n => n>0?'up':(n<0?'dn':'dim');
+function toast(msg,ms=2600){const t=$('toast');t.textContent=msg;t.style.display='block';
+  clearTimeout(t._h);t._h=setTimeout(()=>t.style.display='none',ms);}
+
+/* ---------------- tabs ---------------- */
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));
+  document.querySelectorAll('.pane').forEach(x=>x.classList.remove('on'));
+  t.classList.add('on'); $('pane-'+t.dataset.pane).classList.add('on');
+});
+
+/* ---------------- drawer ---------------- */
+$('btnSettings').onclick=()=>{$('drawer').classList.add('on');$('scrim').classList.add('on');fillSettings();};
+$('btnCloseDrawer').onclick=$('scrim').onclick=()=>{$('drawer').classList.remove('on');$('scrim').classList.remove('on');};
+$('btnRefresh').onclick=async()=>{await fetch('/api/refresh',{method:'POST'});toast('Refresh queued');poll(1200);};
+$('btnSaveToken').onclick=async()=>{
+  const token=$('tok').value.trim(); if(!token) return toast('Paste a token first');
+  $('btnSaveToken').disabled=true; $('btnSaveToken').textContent='Checking…';
+  const r=await fetch('/api/token',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token})});
+  const j=await r.json(); $('btnSaveToken').disabled=false; $('btnSaveToken').textContent='Go live';
+  if(!j.ok) return toast('✕ '+j.error,6000);
+  toast('✓ Live mode on'); $('tok').value=''; setTimeout(()=>poll(800),600);
+};
+$('btnSaveCreds').onclick=async()=>{
+  const api_key=$('ckey').value.trim(), api_secret=$('csecret').value.trim();
+  if(!api_key||!api_secret) return toast('Both API key and secret are needed');
+  const r=await fetch('/api/credentials',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({api_key,api_secret})});
+  const j=await r.json(); toast(j.ok?'✓ Credentials saved':'✕ '+j.error, 4000);
+  if(j.ok){$('ckey').value='';$('csecret').value='';poll(400);}
+};
+$('btnAuthCode').onclick=async()=>{
+  const code=$('authcode').value.trim(); if(!code) return toast('Paste the code or redirect URL');
+  $('btnAuthCode').disabled=true;
+  const r=await fetch('/api/auth-code',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code})});
+  const j=await r.json(); $('btnAuthCode').disabled=false;
+  if(!j.ok) return toast('✕ '+j.error, 8000);
+  toast('✓ Connected to Upstox'); $('authcode').value=''; setTimeout(()=>poll(600),500);
+};
+$('btnCopyLogin').onclick=()=>{
+  const url=(S.data&&S.data.auth&&S.data.auth.login_url)||'';
+  if(!url) return toast('Save your API key + secret first');
+  navigator.clipboard.writeText(url).then(()=>toast('Login link copied — open it in a new tab'),()=>toast(url,9000));
+};
+document.querySelectorAll('[data-copy]').forEach(b=>b.onclick=()=>{
+  const el=$(b.dataset.copy); if(!el) return;
+  navigator.clipboard.writeText(el.textContent.trim()).then(()=>{b.textContent='copied';setTimeout(()=>b.textContent='copy',1500);},
+    ()=>toast(el.textContent.trim(),9000));
+});
+$('btnDemo').onclick=async()=>{await fetch('/api/demo',{method:'POST'});toast('Switched to demo data');setTimeout(()=>poll(500),400);};
+
+$('btnRebuild').onclick=async()=>{
+  toast('Rebuilding list…',4000);
+  const r=await fetch('/api/universe',{method:'POST'}); const j=await r.json();
+  toast(j.ok?('✓ F&O list rebuilt: '+j.count+' stocks'):('✕ '+j.error),5000); setTimeout(()=>poll(800),600);
+};
+$('btnSaveSettings').onclick=async()=>{
+  const body={
+    refresh_sec:+$('s_refresh').value, deep_depth:+$('s_depth').value,
+    min_turnover_cr:+$('s_turn').value, max_spread_pct:+$('s_spread').value,
+    min_atr_pct:+$('s_atr').value, min_price:+$('s_price').value,
+    picks_per_side:+$('s_picks').value, sector_cap:+$('s_sector').value,
+    score_floor:+$('s_floor').value, show_longs:$('s_longs').checked, show_shorts:$('s_shorts').checked,
+    ban_list:$('s_ban').value.split(',').map(x=>x.trim()).filter(Boolean)
+  };
+  const r=await fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  const j=await r.json(); toast(j.ok?'✓ Settings saved':'✕ could not save');
+  if(j.ok){ $('drawer').classList.remove('on'); $('scrim').classList.remove('on'); setTimeout(()=>poll(400),300); }
+};
+function fillAuth(a){
+  if(!a) return;
+  const redir=$('redir'); if(redir) redir.textContent=a.redirect_uri||a.redirect_uri_local||'';
+  const alt=$('redirAlt');
+  if(alt){
+    const pub=a.redirect_uri&&!a.redirect_uri.startsWith('http://localhost');
+    alt.innerHTML = pub
+      ? 'Running on a laptop too? register <code>'+a.redirect_uri_local+'</code> as a second redirect URI, or swap between them.'
+      : 'Using the hosted preview instead? register <code>'+(a.redirect_uri||'')+'</code>';
+  }
+  const link=$('loginLink');
+  if(a.login_url && a.api_key_set){
+    link.href=a.login_url;
+    link.className='btnlink';
+    link.textContent='Login with Upstox →';
+  } else {
+    link.removeAttribute('href');
+    link.className='btnlink off';
+    link.textContent='Save API key + secret first';
+  }
+  const st=$('authStatus');
+  if(st){
+    st.innerHTML = (a.api_key_set?'<span class="okline">✓ API key saved</span> ('+(a.api_key_hint||'')+')':'<span class="dim2">no API key saved</span>')
+      + ' · ' + (a.token_present?'<span class="okline">token saved</span>':'<span class="dim2">no token yet</span>')
+      + (a.api_key_set&&!a.api_secret_set?' · <span class="badline">secret missing</span>':'');
+  }
+  const keyHint=$('ckey');
+  if(keyHint&&a.api_key_set) keyHint.placeholder='API key saved ('+(a.api_key_hint||'')+') — paste to replace';
+}
+function fillSettings(){
+  if(S.data) fillAuth(S.data.auth);
+  const s=(S.data&&S.data.settings)||{};
+  $('s_refresh').value=s.refresh_sec??20; $('s_depth').value=s.deep_depth??40;
+  $('s_turn').value=s.min_turnover_cr??35; $('s_spread').value=s.max_spread_pct??0.18;
+  $('s_atr').value=s.min_atr_pct??0.9; $('s_price').value=s.min_price??40;
+  $('s_picks').value=s.picks_per_side??5; $('s_sector').value=s.sector_cap??2;
+  $('s_floor').value=s.score_floor??52; $('s_longs').checked=s.show_longs!==false;
+  $('s_shorts').checked=s.show_shorts!==false; $('s_ban').value=(s.ban_list||[]).join(', ');
+}
+
+/* ---------------- sparkline ---------------- */
+function spark(vals, up){
+  if(!vals||vals.length<3) return '';
+  const w=320,h=38,p=3, mn=Math.min(...vals), mx=Math.max(...vals), rg=(mx-mn)||1;
+  const pts=vals.map((v,i)=>[p+i*(w-2*p)/(vals.length-1), h-p-((v-mn)/rg)*(h-2*p)]);
+  const d=pts.map((pt,i)=>(i?'L':'M')+pt[0].toFixed(1)+' '+pt[1].toFixed(1)).join(' ');
+  const col=up?'#22c55e':'#ef4444';
+  const last=pts[pts.length-1];
+  return `<svg class="spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" style="width:100%">
+    <path d="${d} L ${last[0]} ${h} L ${pts[0][0]} ${h} Z" fill="${col}" opacity=".10"/>
+    <path d="${d}" fill="none" stroke="${col}" stroke-width="1.8" stroke-linejoin="round"/>
+    <circle cx="${last[0]}" cy="${last[1]}" r="2.6" fill="${col}"/></svg>`;
+}
+
+/* ---------------- cards ---------------- */
+function scoreCls(v){ return v>=72?'hi':(v>=62?'md':'lo'); }
+function card(p){
+  const l=p.levels, dir=p.direction;
+  const badge = p.since_flagged_pct!==null && Math.abs(p.since_flagged_pct)<0.05 && p.status==='WATCH'
+      ? '<span class="badge new">NEW</span>' : '';
+  const why = p.why.map(w=>`<li><span class="b">${dir==='long'?'▲':'▼'}</span><span>${w}</span></li>`).join('');
+  const risks = (p.risks&&p.risks.length)?`<div class="risk">⚠ ${p.risks.join(' · ')}</div>`:'';
+  return `<div class="card ${dir}">
+    <div class="top">
+      <div class="rank">${p.rank}</div>
+      <div>
+        <div class="sym">${p.symbol} ${badge}</div>
+        <div class="sub">${p.sector} · ${p.fut_symbol||''} · lot ${p.lot_size}</div>
+      </div>
+      <div class="score"><div class="n ${scoreCls(p.score)}">${p.score}</div><div class="l">score</div></div>
+    </div>
+    <div class="px">
+      <span class="now">${money(p.ltp)}</span>
+      <span class="chg ${cls(p.pct_chg)}">${sgn(p.pct_chg)}%</span>
+      <span class="vs">vs NIFTY ${sgn(p.rel_strength)}%</span>
+      <span class="vs">· fut ${money(p.fut_ltp)}</span>
+    </div>
+    ${spark(p.spark, dir==='long')}
+    <div class="lvl">
+      <div class="entry"><div class="k">Entry</div><div class="v">${fmt(l.entry)}</div></div>
+      <div class="sl"><div class="k">Stop</div><div class="v">${fmt(l.sl)}</div></div>
+      <div class="t"><div class="k">T1</div><div class="v">${fmt(l.t1)}</div></div>
+      <div class="t"><div class="k">T2</div><div class="v">${fmt(l.t2)}</div></div>
+    </div>
+    <div class="meta">
+      <span>R:R <b>1:${fmt(l.rr,1)}</b></span>
+      <span>risk <b>${fmt(l.risk_pct,2)}%</b></span>
+      <span>risk/lot <b>₹${fmt(l.risk_per_lot,0)}</b></span>
+      <span>RVOL <b>${fmt(p.rvol,1)}x</b></span>
+      <span>OI Δ <b class="${cls(p.oi_chg_pct)}">${sgn(p.oi_chg_pct)}%</b></span>
+      <span>turnover <b>₹${fmt(p.turnover_cr,0)}cr</b></span>
+    </div>
+    <div class="ready" onclick="this.parentNode.classList.toggle('open')" title="Tap to see the checks">
+      <span class="v v-${(p.readiness&&p.readiness.verdict||'WAIT').replace(' ','')}">${p.readiness?p.readiness.verdict:'—'}</span>
+      <span class="r">${p.readiness?p.readiness.reason:''}</span>
+    </div>
+    <div class="checks">
+      ${(p.readiness&&p.readiness.checks||[]).map(c=>`<div class="chk ${c.ok?'ok':'no'}">
+        <span class="i">${c.ok?'✓':'✕'}</span><span><b>${c.name}</b> — ${c.detail}</span></div>`).join('')}
+    </div>
+    <ul class="why">${why}</ul>
+    ${risks}
+    <div class="stab">
+      <span>on list <b>${p.stability?p.stability.on_list_min.toFixed(0):0} min</b></span>
+      <span>best rank <b>#${p.stability?p.stability.best_rank:'—'}</b></span>
+      <span>score <b>${p.stability?p.stability.score_trend:'—'}</b> (peak ${p.stability?p.stability.score_peak:'—'})</span>
+      <span>since flagged <b class="${cls(p.since_flagged_pct)}">${sgn(p.since_flagged_pct)}%</b></span>
+      <button class="mini copyplan" onclick="copyPlan('${p.symbol}','${p.direction}')">copy plan</button>
+    </div>
+    <div class="foot">
+      <span class="badge b-${p.status}">${p.status}</span>
+      <span title="${l.mode}">${l.mode.split('—')[0].trim()}</span>
+      <span>· since flagged <b class="${cls(p.since_flagged_pct)}">${sgn(p.since_flagged_pct)}%</b></span>
+      <span>· ${p.r_now>=0?'+':''}${fmt(p.r_now,2)}R</span>
+    </div>
+  </div>`;
+}
+
+/* ---------------- table ---------------- */
+function renderTable(rows){
+  const q=$('q').value.trim().toLowerCase(), onlyT=$('onlyTrade').checked, onlyS=$('onlyScored').checked;
+  let rs=rows.filter(r=>{
+    if(q && !(r.symbol.toLowerCase().includes(q)||(r.sector||'').toLowerCase().includes(q))) return false;
+    if(onlyT && r.gate!=='pass') return false;
+    if(onlyS && !(r.score_long||r.score_short)) return false;
+    return true;
+  });
+  const k=S.sortK, d=S.sortDir;
+  rs.sort((a,b)=>{const A=a[k]??-1e9,B=b[k]??-1e9;
+    return (typeof A==='string')? d*A.localeCompare(B) : d*(A-B);});
+  const sch=(v,short)=>{ if(!v) return '<span class="sch lo">—</span>';
+    const c=v>=72?(short?'hir':'hi'):(v>=62?'md':'lo'); return `<span class="sch ${c}">${v.toFixed(0)}</span>`;};
+  $('tbl').querySelector('tbody').innerHTML = rs.map(r=>`<tr>
+    <td><b>${r.symbol}</b>${r.deep?' <span class="dim2" title="1-min analysed">•</span>':''}</td>
+    <td class="dim">${r.sector}</td>
+    <td>${fmt(r.ltp)}</td>
+    <td class="${cls(r.pct_chg)}">${sgn(r.pct_chg)}%</td>
+    <td>${fmt(r.rvol,1)}x</td>
+    <td class="${cls(r.oi_chg)}">${sgn(r.oi_chg)}%</td>
+    <td>${fmt(r.turnover_cr,0)}</td>
+    <td>${fmt(r.atr_pct,1)}%</td>
+    <td>${sch(r.score_long,false)}</td>
+    <td>${sch(r.score_short,true)}</td>
+    <td class="g-${r.gate}">${r.gate}</td></tr>`).join('');
+  $('rowCount').textContent = rs.length+' of '+rows.length+' shown';
+}
+document.querySelectorAll('#tbl th').forEach(th=>th.onclick=()=>{
+  const k=th.dataset.k; if(S.sortK===k) S.sortDir*=-1; else {S.sortK=k;S.sortDir=-1;}
+  renderTable(S.data.universe);
+});
+['q','onlyTrade','onlyScored'].forEach(id=>$(id).addEventListener('input',()=>S.data&&renderTable(S.data.universe)));
+$('onlyReady').addEventListener('change',()=>S.data&&render(S.data));
+
+/* ---------------- copy a one-line trade plan ---------------- */
+function copyPlan(sym, dir){
+  const p = (S.picks && (S.picks[dir]||[]).find(x=>x.symbol===sym)) || null;
+  if(!p) return toast('Pick not available');
+  const l = p.levels;
+  const txt = `${p.symbol} ${dir==='long'?'LONG (buy fut)':'SHORT (sell fut)'} @ ${l.entry} | SL ${l.sl} | T1 ${l.t1} | T2 ${l.t2} | risk ${l.risk_pct}% | Rs${Math.round(l.risk_per_lot)}/lot | ${p.fut_symbol}`;
+  navigator.clipboard.writeText(txt).then(()=>toast('✓ Plan copied: '+txt.slice(0,60)+'…'),()=>toast(txt,9000));
+}
+
+/* ---------------- main render ---------------- */
+function render(d){
+  S.data=d;
+  const c=d.context||{}, m=d.market||{}, st=d.stats||{};
+  /* header */
+  $('clock').textContent = (m.ist_hm||'') + ' IST';
+  $('modePill').className = 'pill '+(d.mode==='live'?'live':'demo');
+  $('modePill').innerHTML = d.mode==='live'
+    ? '<span class="dot"></span> LIVE · Upstox'
+    : 'DEMO DATA';
+  const open = m.state==='open';
+  $('mktPill').className='pill '+(open?'live':'closed');
+  $('mktPill').innerHTML = open ? '<span class="dot"></span> MARKET OPEN'
+    : 'MARKET '+ (m.state||'').toUpperCase().replace('-',' ');
+  const secs = Math.max(0,(d.settings?.refresh_sec||20) - ((Date.now()-new Date(d.server_time_ist).getTime())/1000));
+  $('nextUpd').textContent = open ? 'next update ~'+Math.round(secs)+'s' : '';
+
+  /* banners */
+  let b='';
+  if(d.auth_error) b+=`<div class="banner err">🔒 <div><b>${d.auth_error}</b><br>
+    <span class="dim">Paste a fresh access token in Settings → “Go live”.</span></div></div>`;
+  if(d.mode==='demo' && !d.token_present) b+=`<div class="banner warn">⚠️ <div><b>Demo data.</b>
+    <span class="dim">Paste your Upstox access token in <b>Settings</b> (or add your API key + secret for one-click login)
+    to switch to your real live feed.</span></div></div>`;
+  if(d.mode==='live' && !open) b+=`<div class="banner info">🌙 <div><b>Market is closed${m.state==='weekend'?' (weekend)':''}.</b>
+    <span class="dim">Showing the last completed session (${d.session_date}). Setups refresh when the market opens at 09:15 IST.</span></div></div>`;
+  if(!st.warm_done && st.warm_total) {
+    const pct=Math.round(100*st.warm_done_count/st.warm_total);
+    b+=`<div class="banner info">⏳ <div><b>Warming up daily data ${pct}%</b>
+      <span class="dim">(${st.warm_done_count}/${st.warm_total} stocks — PDH/PDL, ATR, 20-day averages). Picks appear as coverage grows.</span></div></div>`;
+  }
+  if(d.last_error && !d.auth_error) b+=`<div class="banner warn">⚠️ <div><span class="dim">${d.last_error}</span></div></div>`;
+  $('banners').innerHTML=b;
+
+  /* market tiles */
+  const nx=c.nifty||{}, bk=c.banknifty||{}, vx=c.vix||{};
+  $('niftyV').textContent = nx.ltp?fmt(nx.ltp,1):'—';
+  $('niftyV').className='v '+(nx.pct>0?'up':nx.pct<0?'dn':'');
+  $('niftyS').innerHTML = nx.pct!=null?`<span class="${cls(nx.pct)}">${sgn(nx.pct)}%</span>`:'—';
+  $('bankV').textContent = bk.ltp?fmt(bk.ltp,1):'—';
+  $('bankV').className='v '+(bk.pct>0?'up':bk.pct<0?'dn':'');
+  $('bankS').innerHTML = bk.pct!=null?`<span class="${cls(bk.pct)}">${sgn(bk.pct)}%</span>`:'—';
+  $('vixV').textContent = vx.ltp?fmt(vx.ltp,2):'—';
+  $('vixS').innerHTML = vx.pct!=null?`<span class="${cls(vx.pct)}">${sgn(vx.pct)}%</span> <span class="dim">volatility</span>`:'—';
+  const br=c.breadth_up_pct;
+  $('brV').textContent = br!=null?fmt(br,0)+'% up':'—';
+  $('brV').className='v '+(br>55?'up':br<45?'dn':'');
+  $('brS').textContent = (c.adv??0)+' advancing · '+(c.dec??0)+' declining';
+  $('scanV').textContent = (st.scanned??0)+' / '+(st.total??210);
+  $('scanS').textContent = 'deep-scanned '+ (st.deep_scanned??0) +' · coverage '+(st.coverage_pct??0)+'%';
+  const bb=$('brBar'); if(br!=null) bb.innerHTML=`<div class="g" style="width:${br}%"></div><div class="r" style="width:${100-br}%"></div>`;
+  $('regimeTag').textContent = (c.regime||'—') + (c.bias && c.bias!=='neutral' ? ' · '+(c.bias==='long'?'long bias':'short bias') : '');
+  $('regimeTag').className = 'tag '+(c.regime==='Risk-On'?'riskOn':(c.regime==='Risk-Off'?'riskOff':'chop'));
+  $('regimeNote').textContent = c.regime_note||'';
+  const ss=(c.sectors||[]).filter(s=>s.n>=3);
+  if(ss.length>=2){
+    const top=ss[0], bot=ss[ss.length-1];
+    $('sectorTop').innerHTML = `strongest <b class="up">${top.sector} ${sgn(top.pct)}%</b> · weakest <b class="dn">${bot.sector} ${sgn(bot.pct)}%</b>`;
+  }
+
+  /* session phase bar */
+  const ph = d.phase||{};
+  const segs = [["pre-open","09:15"],["open-range","09:30"],["trend","10:15"],["midday","11:30"],
+                ["afternoon","13:30"],["late","14:45"],["close","15:15"]];
+  const widths = [15,45,75,120,75,45,15];
+  const colorOf = k => (k==='open-range'||k==='afternoon')?'#22c55e':(k==='trend'?'#38bdf8':(k==='midday'?'#f59e0b':(k==='late'?'#fb923c':'#334155')));
+  const totalW = widths.reduce((a,b)=>a+b,0);
+  const tl = segs.map((sg,i)=>{
+    const on = ph.key===sg[0];
+    return `<i style="width:${widths[i]/totalW*100}%;background:${on?colorOf(sg[0]):'#1a2337'};border-right:1px solid #0b0e14"
+      title="${sg[1]} ${sg[0]}"></i>`;
+  }).join('');
+  const nt = ph.minutes_to_next ? ` · ${ph.minutes_to_next} min to next phase` : '';
+  $('phasebar').innerHTML = `<span class="pl pl-${ph.label||'Closed'}">${(ph.label||'—').toUpperCase()}</span>
+    <span style="font-size:12.5px" class="dim">${ph.note||''}${nt}</span>
+    <div class="timeline">${tl}</div>`;
+
+  /* funnel */
+  const f=d.funnel||{};
+  const step=(lbl,v,tip)=>`<span class="fstep" title="${tip||''}"><span class="dim">${lbl}</span> <b>${v??'—'}</b></span>`;
+  $('funnel').innerHTML = step('F&O universe',f.all)+'<span class="farrow">→</span>'
+    + step('passing gates',f.liquid,'liquidity, spread, ATR, circuit, ban list')
+    +'<span class="farrow">→</span>'+ step('with momentum',f.momentum,'pre-score ≥ 45')
+    +'<span class="farrow">→</span>'+ step('deep 1-min scan',f.deep)
+    +'<span class="farrow">→</span>'+ step('<span class="up">final picks</span>',f.final)
+    + `<span class="spacer"></span><span class="dim2 mono" style="font-size:11px">${d.mode==='live'?'live':'demo'} · cycle ${st.cycle??0} · poll ${st.poll_seconds??'—'}s · IST ${(m.ist_hm||'')}</span>`;
+
+  /* picks */
+  const L=(d.picks&&d.picks.long)||[], Sh=(d.picks&&d.picks.short)||[];
+  $('cntLong').textContent = L.length?`— ${L.length} of ${f.liquid??0} gated stocks`:'';
+  $('cntShort').textContent = Sh.length?`— ${Sh.length} of ${f.liquid??0} gated stocks`:'';
+  S.picks = {long:L, short:Sh};
+  const onlyReady = $('onlyReady').checked;
+  const filt = ps => onlyReady ? ps.filter(p=>p.readiness && p.readiness.verdict==='READY') : ps;
+  const nrL = filt(L), nrS = filt(Sh);
+  $('readyHint').textContent = onlyReady
+    ? `${nrL.length} long / ${nrS.length} short are actionable right now`
+    : `${L.filter(p=>p.readiness&&p.readiness.verdict==='READY').length} of ${L.length} longs and ${Sh.filter(p=>p.readiness&&p.readiness.verdict==='READY').length} of ${Sh.length} shorts are READY`;
+  $('gridLong').innerHTML = L.length? (nrL.length? nrL.map(card).join('')
+      : `<div class="empty">${onlyReady?'No long is actionable this minute.':'No long setup clears the bar right now.'}<br><span class="dim">${onlyReady?'Untick “actionable only” to see what is close, or wait for the next phase.':'The engine shows nothing rather than a weak trade.'}</span></div>`)
+    : `<div class="empty">No long setup clears the bar right now.<br><span class="dim">The engine shows nothing rather than a weak trade.</span></div>`;
+  $('gridShort').innerHTML = Sh.length? (nrS.length? nrS.map(card).join('')
+      : `<div class="empty">${onlyReady?'No short is actionable this minute.':'No short setup clears the bar right now.'}<br><span class="dim">${onlyReady?'Untick “actionable only” to see what is close.':'The engine shows nothing rather than a weak trade.'}</span></div>`)
+    : `<div class="empty">No short setup clears the bar right now.<br><span class="dim">The engine shows nothing rather than a weak trade.</span></div>`;
+
+  /* table */
+  if(d.universe) renderTable(d.universe);
+
+  /* settings status box */
+  $('statBox').innerHTML = `mode <b>${d.mode}</b> · token <b>${d.token_present?'saved':'none'}</b><br>
+    session <b>${d.session_date||''}</b> · market <b>${m.state||''}</b><br>
+    warm-up <b>${st.warm_done_count||0}/${st.warm_total||210}</b> · deep <b>${st.deep_scanned||0}</b><br>
+    API calls <b>${(st.api&&st.api.calls)||0}</b> · errors <b>${(st.api&&st.api.errors)||0}</b><br>
+    ${(st.errors&&st.errors.length)?'<br>last errors:<br>'+st.errors.slice(-3).map(e=>'• '+e).join('<br>'):''}`;
+}
+
+/* ---------------- polling ---------------- */
+async function poll(delay=0){
+  if(delay) await new Promise(r=>setTimeout(r,delay));
+  try{
+    const r=await fetch('/api/snapshot',{cache:'no-store'});
+    const j=await r.json();
+    if(j.ok) render(j);
+  }catch(e){ /* keep last view */ }
+  const every=(S.data&&S.data.settings&&S.data.settings.refresh_sec)?S.data.settings.refresh_sec:20;
+  clearTimeout(S.timer);
+  S.timer=setTimeout(()=>poll(0), Math.max(5000, every*1000));
+}
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) poll(0); });
+window.addEventListener('focus', ()=>poll(0));
+window.addEventListener('pageshow', e=>{ if(e.persisted) poll(0); });
+
+poll(0);
+setInterval(()=>{
+  if(!S.data) return;
+  const el=(Date.now()-new Date(S.data.server_time_ist).getTime())/1000;
+  if(S.data.market && S.data.market.state==='open'){
+    const every=S.data.settings.refresh_sec||20;
+    $('nextUpd').textContent='next update ~'+Math.max(0,Math.round(every-el))+'s';
+  }
+},1000);
+</script>
+</body>
+</html>

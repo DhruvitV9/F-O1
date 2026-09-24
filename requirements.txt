@@ -1,0 +1,2 @@
+# Nothing to install — this screener runs on the Python standard library alone.
+# (File kept so hosts like Render/Railway detect the project as a Python app.)

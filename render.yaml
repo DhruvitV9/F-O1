@@ -1,0 +1,35 @@
+# Render Blueprint - https://render.com/docs/blueprint-spec
+# Deploy: push this repo to GitHub, then Render -> New -> Blueprint -> pick the repo.
+services:
+  - type: web
+    name: fno-screener
+    runtime: python
+    plan: free                      # 'starter' if you want it always-on / persistent disk
+    buildCommand: "echo 'No build step - standard library only'"
+    startCommand: "python3 -u server.py"
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.6"
+      # Set this in the Render dashboard (it is a secret, so it is not stored here)
+      - key: APP_PASSWORD
+        sync: false
+      # Optional but handy: skips the paste-a-token step after a restart
+      - key: UPSTOX_ACCESS_TOKEN
+        sync: false
+    # ---------------------------------------------------------------------------
+    # OPTIONAL - only on paid plans. A disk keeps your token, credentials, warm-up
+    # cache and pick logs across restarts (fewer Upstox calls, no re-login).
+    # If you enable it, also uncomment the three dir vars below.
+    # disk:
+    #   name: screener-data
+    #   mountPath: /var/data
+    #   sizeGB: 1
+    #
+    #  - key: CACHE_DIR
+    #    value: /var/data/cache
+    #  - key: LOGS_DIR
+    #    value: /var/data/logs
+    #  - key: RUNTIME_DIR
+    #    value: /var/data/runtime
