@@ -22,8 +22,9 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-DIALOG_URL = "https://api.upstox.com/v2/login/authorization/dialog"
-TOKEN_URL = "https://api.upstox.com/v2/login/authorization/token"
+_API_ROOT = (os.environ.get("UPSTOX_API_ROOT") or "https://api.upstox.com").rstrip("/")
+DIALOG_URL = _API_ROOT + "/v2/login/authorization/dialog"
+TOKEN_URL = _API_ROOT + "/v2/login/authorization/token"
 
 
 # ------------------------------------------------------------------ credentials

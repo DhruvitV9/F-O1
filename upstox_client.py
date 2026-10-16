@@ -8,6 +8,7 @@ error messages the UI can show to the user.
 from __future__ import annotations
 
 import json
+import os
 import threading
 import time
 import urllib.error
@@ -17,16 +18,25 @@ from collections import deque
 from datetime import datetime, timedelta, timezone
 
 IST = timezone(timedelta(hours=5, minutes=30))
-API_ROOT = "https://api.upstox.com"
+# Upstox's own API host. Overridable so the app can be pointed at a test/staging
+# endpoint (e.g. a stub server) without touching code. Default is the real API.
+API_ROOT = (os.environ.get("UPSTOX_API_ROOT") or "https://api.upstox.com").rstrip("/")
 
 
 class UpstoxError(Exception):
-    def __init__(self, msg, status=None, code=None):
+    def __init__(self, msg, status=None, code=None, network=False):
         super().__init__(msg)
         self.status = status
         self.code = code
+        # True when the request never got an HTTP reply (DNS/TLS/timeout). Callers
+        # use this to tell "we couldn't reach Upstox" apart from "Upstox said no".
+        self.network = network
 
     def friendly(self) -> str:
+        if self.network:
+            return ("Can't reach Upstox from this server — outbound access to "
+                    "api.upstox.com is blocked or unavailable. Your access token was "
+                    "never checked. Live mode works on a host with normal internet access.")
         if self.status == 401 or self.status == 403:
             return "Access token invalid or expired — generate a fresh token for today."
         if "UDAPI100043" in str(self.code or "") or "500" in str(self.code or ""):
@@ -120,7 +130,7 @@ class UpstoxClient:
                     continue
                 break
             except (urllib.error.URLError, TimeoutError, OSError) as e:
-                last_exc = UpstoxError(f"network: {e}")
+                last_exc = UpstoxError(f"network: {e}", network=True)
                 time.sleep(min(2.0 ** attempt, 8.0))
         with self._s:
             self.stats["errors"] += 1

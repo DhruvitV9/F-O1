@@ -1,0 +1,15 @@
+# Runtime data written by the app at boot — never commit these.
+cache/
+logs/
+runtime/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/

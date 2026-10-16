@@ -190,7 +190,37 @@ v3 field notes worth remembering if you extend the code:
 Only 2 of ~300 warm-up calls were throttled (429) and both recovered on retry — the client
 backs off automatically. Rate limits default to 80/min for candle calls.
 
-## 9. Honest notes
+## 9. Session replay — backtest the "First seen" column
+
+The live screen stamps each stock with the first moment it entered the Long or Short table
+under the filter you had set. **`replay.py`** answers the obvious follow-up — *when* would it
+have entered under a different filter? — by walking a finished session through the **same
+`engine.py`**, one minute at a time, with the engine clock pinned to the replayed minute
+(RVOL pace, turnover projection and session phase all follow it).
+
+```bash
+python3 replay.py                       # last session, no filter (fetches + caches candles)
+python3 replay.py --session 2026-10-16 --step 1 --rvol 1.5 --cap 40
+python3 replay.py --collect-only         # just fetch/cache the candles
+python3 replay_report.py                 # build the filterable HTML report
+```
+
+| Output | What it holds |
+|---|---|
+| `cache/replay/candles_<session>.json.gz` | daily + 1-minute candles for that session, fetched once |
+| `logs/replay/replay_<session>_rv…_cl…_cs….csv` | one row per stock **per table**: `first_seen, last_seen, minutes_on, score, other_score, rvol, …` |
+| `logs/replay/frames_<session>.json` | every stock's Long/Short score + RVOL for every minute — the raw material for changing filters after the fact |
+| `logs/replay/report_<session>.html` | self-contained page (no assets, no API calls) served at **`/replay`** |
+
+In the report, the RVOL / `Short ≤` / `Long ≤` boxes recompute every first-seen time in the
+browser using exactly the predicate in `static/index.html`, and the grid underneath shows the
+whole filter space at once (stocks that would have entered, and the median time they did).
+
+The round trip is verified: the replay re-derives the names the live screen logged as picks
+that day, and `replay.py` prints that cross-check at the end of every run. Note that first-seen
+times are the minutes a filter was **satisfied**, not when the live page happened to refresh.
+
+## 10. Honest notes
 
 - Picks are **intraday ideas for the current session** — square off before 15:15–15:30 IST unless you deliberately carry over.
 - These are **futures** trades: contract and lot size are on each card, and margins apply. Risk per lot is shown so you can size properly.

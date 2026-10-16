@@ -15,6 +15,7 @@ Endpoints
 """
 from __future__ import annotations
 
+import glob
 import hashlib
 import hmac
 import json
@@ -33,6 +34,11 @@ from universe import build_universe
 from upstox_client import IST, UpstoxError
 
 BASE = os.path.dirname(os.path.abspath(__file__))
+# Normally empty: the app talks to the real api.upstox.com. If someone sets
+# UPSTOX_API_ROOT (e.g. to a local stub) we surface it so the UI can warn that
+# the feed is not Upstox.
+_custom_root = (os.environ.get("UPSTOX_API_ROOT") or "").rstrip("/")
+CUSTOM_API_ROOT = "" if (not _custom_root or _custom_root == "https://api.upstox.com") else _custom_root
 # Every writable location can be redirected (e.g. to a mounted disk on Render) so the
 # warm-up cache, your token and your credentials survive restarts and redeploys.
 CACHE = os.environ.get("CACHE_DIR") or os.path.join(BASE, "cache")
@@ -166,7 +172,9 @@ def start_engine(mode: str, token: str = ""):
                 except UpstoxError as e:
                     msg = e.friendly()
                     STATE["last_error"] = msg
-                    if e.status in (401, 403) or "token" in msg.lower():
+                    # A network failure is transient — keep retrying. Only a real
+                    # rejection (401/403) or an explicit token complaint stops the loop.
+                    if not e.network and (e.status in (401, 403) or "token" in msg.lower()):
                         STATE["auth_error"] = msg
                         STATE["stop"].set()   # stop hammering an invalid token
                 except Exception as e:        # noqa: BLE001
@@ -251,6 +259,59 @@ def auth_status(host_header: str = "") -> dict:
 
 
 # ------------------------------------------------------------------------ API
+REPLAY_MISSING_PAGE = b"""<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Session replay \u00b7 F&amp;O screener</title>
+<style>body{margin:0;background:#070a10;color:#e9eefb;
+ font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+ .w{max-width:720px;margin:0 auto;padding:56px 20px}a{color:#4c8dff;text-decoration:none}
+ code{background:#131b28;border:1px solid rgba(148,170,210,.18);border-radius:6px;padding:2px 7px;
+ font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px}
+ h1{font-size:19px;margin:0 0 6px}p{color:#8a97b4}
+ pre{background:#0e141f;border:1px solid rgba(148,170,210,.10);border-radius:12px;padding:14px 16px;
+ overflow:auto;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;color:#c3cede}</style>
+</head><body><div class="w">
+<h1>No session replay built yet</h1>
+<p>The replay walks a finished session through the real scoring engine and writes one
+filterable page per session. Build it once with a working Upstox token:</p>
+<pre>python3 replay.py --session 2026-10-16
+python3 replay_report.py</pre>
+<p>Then reload this page. The report is static: nothing here touches the live screen or the API.</p>
+<p><a href="/">\u2190 back to the live screen</a></p>
+</div></body></html>"""
+
+
+def replay_info() -> dict:
+    """Newest session-replay report on disk, so the UI can label the Replay button.
+
+    Reports are static HTML written by replay_report.py; this only reports what
+    exists and never builds anything.
+    """
+    try:
+        reports = glob.glob(os.path.join(BASE, "logs", "replay", "report_*.html"))
+    except OSError:
+        return {}
+    if not reports:
+        return {}
+    newest = max(reports, key=os.path.getmtime)
+    name = os.path.basename(newest)
+    sess = name[len("report_"):-len(".html")] if name.startswith("report_") else ""
+    try:
+        built = datetime.fromtimestamp(os.path.getmtime(newest), IST).isoformat(timespec="seconds")
+    except OSError:
+        built = ""
+    return {"session": sess, "built": built, "file": name}
+
+
+def ui_version() -> str:
+    """Short hash of the current index.html — changes whenever the UI changes."""
+    try:
+        with open(os.path.join(STATIC, "index.html"), "rb") as f:
+            return hashlib.sha1(f.read()).hexdigest()[:12]
+    except OSError:
+        return ""
+
+
 def api_snapshot(host_header: str = "") -> dict:
     with STATE["lock"]:
         eng, mode = STATE["engine"], STATE["mode"]
@@ -267,7 +328,15 @@ def api_snapshot(host_header: str = "") -> dict:
     data["mode"] = mode
     data["auth"] = auth_status(host_header)
     data["app"] = {"password_gate": auth_enabled(),
-                   "persistent_dirs": {"cache": CACHE, "logs": LOGS, "runtime": RUNTIME}}
+                   "persistent_dirs": {"cache": CACHE, "logs": LOGS, "runtime": RUNTIME},
+                   # Lets an open tab notice that the UI on disk has changed.
+                   "ui_version": ui_version(),
+                   # Set only when UPSTOX_API_ROOT points away from Upstox itself.
+                   # The UI warns loudly in that case, so a stand-in feed can never
+                   # be mistaken for real market data.
+                   "custom_api_root": CUSTOM_API_ROOT,
+                   # Session the /replay report covers, if one has been built.
+                   "replay": replay_info()}
     return data
 
 
@@ -288,6 +357,10 @@ def api_token(tok: str) -> dict:
         return {"ok": False, "error": f"Could not reach Upstox: {e}"}, 400
     save_token(tok)
     start_engine("live", tok)
+    if CUSTOM_API_ROOT:
+        return {"ok": True, "mode": "live",
+                "message": f"Connected — but this server is pointed at {CUSTOM_API_ROOT}, "
+                           f"not Upstox. The feed is simulated."}, 200
     return {"ok": True, "mode": "live", "message": "Live mode on — pulling real quotes now."}, 200
 
 
@@ -447,6 +520,22 @@ class Handler(BaseHTTPRequestHandler):
         except (BrokenPipeError, ConnectionResetError):
             pass
 
+    def _serve_replay(self):
+        """Serve the newest session-replay report built by replay_report.py.
+
+        It is a single self-contained HTML file (no assets, no API calls), so it
+        is served straight off disk and can never interfere with the live screen.
+        """
+        reports = glob.glob(os.path.join(BASE, "logs", "replay", "report_*.html"))
+        if not reports:
+            return self._send(REPLAY_MISSING_PAGE, 200, "text/html")
+        newest = max(reports, key=os.path.getmtime)
+        try:
+            with open(newest, "rb") as f:
+                return self._send(f.read(), 200, "text/html")
+        except OSError:
+            return self._send(REPLAY_MISSING_PAGE, 200, "text/html")
+
     def _host(self) -> str:
         return (self.headers.get("X-Forwarded-Host") or self.headers.get("Host") or "").strip()
 
@@ -474,9 +563,17 @@ class Handler(BaseHTTPRequestHandler):
             fp = os.path.join(STATIC, "index.html")
             try:
                 with open(fp, "rb") as f:
-                    return self._send(f.read(), 200, "text/html")
+                    body = f.read()
+                # Stamp the page with a hash of its own content. An open tab keeps
+                # rebuilding its table from /api/snapshot using the template it was
+                # loaded with, so without this a stale tab never notices new code.
+                ver = ui_version().encode()
+                body = body.replace(b"__UI_VERSION__", ver)
+                return self._send(body, 200, "text/html")
             except OSError:
                 return self._send({"ok": False, "error": "index.html missing"}, 500)
+        if path == "/replay":
+            return self._serve_replay()
         if path == "/api/snapshot":
             obj, status = api_snapshot(self._host()), 200
             return self._send(obj, status)
