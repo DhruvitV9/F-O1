@@ -52,6 +52,12 @@ DEFAULTS = {
     "picks_per_side": 5,
     "score_floor": 52.0,          # minimum composite score to be published
     "ban_list": [],               # NSE F&O ban-list symbols (manual paste ok)
+    # Tapping a stock's name opens this URL with ?symbol=NSE:<symbol> appended.
+    # It must be YOUR saved layout: a layout is what carries your indicators,
+    # colours and drawings, and it only loads on tradingview.com in your own
+    # logged-in browser (an embedded widget can never sign into an account).
+    # Find it by opening that layout and copying TradingView's address bar.
+    "tv_url": "https://www.tradingview.com/chart/5wP8dhEw/",
     "show_longs": True,
     "show_shorts": True,
 }
