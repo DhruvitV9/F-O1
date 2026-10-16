@@ -625,8 +625,9 @@ function render(d){
   /* header */
   $('clock').textContent = ist12(m.ist_hm) + ' IST';
   $('modePill').className = 'pill '+(d.mode==='live'?'live':'demo');
+  const simFeed = !!(d.app && d.app.custom_api_root);
   $('modePill').innerHTML = d.mode==='live'
-    ? '<span class="dot"></span> LIVE · Upstox'
+    ? `<span class="dot"></span> LIVE · ${simFeed?'SIMULATED':'Upstox'}`
     : 'DEMO DATA';
   const open = m.state==='open';
   $('mktPill').className='pill '+(open?'live':'closed');
@@ -649,6 +650,9 @@ function render(d){
     b+=`<div class="banner info">⏳ <div><b>Warming up daily data ${pct}%</b>
       <span class="dim">(${st.warm_done_count}/${st.warm_total} stocks — PDH/PDL, ATR, 20-day averages). Picks appear as coverage grows.</span></div></div>`;
   }
+  if(d.app && d.app.custom_api_root) b+=`<div class="banner err">🧪 <div><b>Simulated feed — not Upstox.</b>
+    <span class="dim">This server is pointed at <code>${d.app.custom_api_root}</code> instead of api.upstox.com.
+    Prices here are generated, not real market data. Remove the UPSTOX_API_ROOT setting to talk to Upstox.</span></div></div>`;
   if(d.last_error && !d.auth_error) b+=`<div class="banner warn">⚠️ <div><span class="dim">${d.last_error}</span></div></div>`;
   $('banners').innerHTML=b;
 

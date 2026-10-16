@@ -33,6 +33,11 @@ from universe import build_universe
 from upstox_client import IST, UpstoxError
 
 BASE = os.path.dirname(os.path.abspath(__file__))
+# Normally empty: the app talks to the real api.upstox.com. If someone sets
+# UPSTOX_API_ROOT (e.g. to a local stub) we surface it so the UI can warn that
+# the feed is not Upstox.
+_custom_root = (os.environ.get("UPSTOX_API_ROOT") or "").rstrip("/")
+CUSTOM_API_ROOT = "" if (not _custom_root or _custom_root == "https://api.upstox.com") else _custom_root
 # Every writable location can be redirected (e.g. to a mounted disk on Render) so the
 # warm-up cache, your token and your credentials survive restarts and redeploys.
 CACHE = os.environ.get("CACHE_DIR") or os.path.join(BASE, "cache")
@@ -269,7 +274,11 @@ def api_snapshot(host_header: str = "") -> dict:
     data["mode"] = mode
     data["auth"] = auth_status(host_header)
     data["app"] = {"password_gate": auth_enabled(),
-                   "persistent_dirs": {"cache": CACHE, "logs": LOGS, "runtime": RUNTIME}}
+                   "persistent_dirs": {"cache": CACHE, "logs": LOGS, "runtime": RUNTIME},
+                   # Set only when UPSTOX_API_ROOT points away from Upstox itself.
+                   # The UI warns loudly in that case, so a stand-in feed can never
+                   # be mistaken for real market data.
+                   "custom_api_root": CUSTOM_API_ROOT}
     return data
 
 
@@ -290,6 +299,10 @@ def api_token(tok: str) -> dict:
         return {"ok": False, "error": f"Could not reach Upstox: {e}"}, 400
     save_token(tok)
     start_engine("live", tok)
+    if CUSTOM_API_ROOT:
+        return {"ok": True, "mode": "live",
+                "message": f"Connected — but this server is pointed at {CUSTOM_API_ROOT}, "
+                           f"not Upstox. The feed is simulated."}, 200
     return {"ok": True, "mode": "live", "message": "Live mode on — pulling real quotes now."}, 200
 
 

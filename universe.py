@@ -22,7 +22,8 @@ import urllib.request
 from datetime import datetime, timedelta, timezone
 
 IST = timezone(timedelta(hours=5, minutes=30))
-INSTRUMENTS_URL = "https://assets.upstox.com/market-quote/instruments/exchange/complete.csv.gz"
+INSTRUMENTS_URL = os.environ.get("UPSTOX_INSTRUMENTS_URL") or \
+    "https://assets.upstox.com/market-quote/instruments/exchange/complete.csv.gz"
 
 SYM_RE = re.compile(r"^(?P<sym>.+?)\d{2}[A-Z]{3}FUT$")
 

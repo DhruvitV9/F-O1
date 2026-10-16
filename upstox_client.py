@@ -8,6 +8,7 @@ error messages the UI can show to the user.
 from __future__ import annotations
 
 import json
+import os
 import threading
 import time
 import urllib.error
@@ -17,7 +18,9 @@ from collections import deque
 from datetime import datetime, timedelta, timezone
 
 IST = timezone(timedelta(hours=5, minutes=30))
-API_ROOT = "https://api.upstox.com"
+# Upstox's own API host. Overridable so the app can be pointed at a test/staging
+# endpoint (e.g. a stub server) without touching code. Default is the real API.
+API_ROOT = (os.environ.get("UPSTOX_API_ROOT") or "https://api.upstox.com").rstrip("/")
 
 
 class UpstoxError(Exception):
