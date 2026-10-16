@@ -286,10 +286,8 @@
 
     <div class="sect">
       <div class="tblhead">
-        <h2>▲ Long setups <span class="cnt">strongest long side · score ≥ 50</span></h2>
-        <span class="fgrp" id="fgLong"><b class="up">▲ LONG</b><span class="dim">≥</span>
-          <input type="number" id="fLongMin" min="0" max="100" step="1" placeholder="any">
-          <span class="dim">· Short ≤</span>
+        <h2>▲ Long setups <span class="cnt">Long &gt; Short · score ≥ 50</span></h2>
+        <span class="fgrp" id="fgLong"><span class="dim">Short ≤</span>
           <input type="number" id="fShortMax" min="0" max="100" step="1" placeholder="any"></span>
       </div>
       <div class="tblwrap">
@@ -307,10 +305,8 @@
 
     <div class="sect">
       <div class="tblhead">
-        <h2>▼ Short setups <span class="cnt">strongest short side · score ≥ 50</span></h2>
-        <span class="fgrp" id="fgShort"><b class="dn">▼ SHORT</b><span class="dim">≥</span>
-          <input type="number" id="fShortMin" min="0" max="100" step="1" placeholder="any">
-          <span class="dim">· Long ≤</span>
+        <h2>▼ Short setups <span class="cnt">Short &gt; Long · score ≥ 50</span></h2>
+        <span class="fgrp" id="fgShort"><span class="dim">Long ≤</span>
           <input type="number" id="fLongMax" min="0" max="100" step="1" placeholder="any"></span>
       </div>
       <div class="tblwrap">
@@ -560,20 +556,21 @@ const tableNum = id => { const v=$(id).value.trim(); return v==='' ? null : Numb
 function renderSide(rows, side){
   const isLong = side==='long';
   const q = $('q').value.trim().toLowerCase(), rvMin = tableNum('fRvol');
-  const minA = tableNum(isLong?'fLongMin' :'fShortMin');   /* this side's score >= */
-  const maxB = tableNum(isLong?'fShortMax':'fLongMax');    /* the other side   <= */
+  /* one box per table, capping the OTHER side:
+       Long table  -> Long > Short  and  Short ≤ X
+       Short table -> Short > Long  and  Long  ≤ X   */
+  const otherMax = tableNum(isLong?'fShortMax':'fLongMax');
   $('fgRvol').classList.toggle('on', rvMin!==null);
-  $(isLong?'fgLong':'fgShort').classList.toggle('on', minA!==null || maxB!==null);
+  $(isLong?'fgLong':'fgShort').classList.toggle('on', otherMax!==null);
 
   const rs = rows.filter(r=>{
     const a = (isLong? r.score_long : r.score_short) ?? 0;   /* this side  */
     const b = (isLong? r.score_short: r.score_long ) ?? 0;   /* other side */
     if(a < SIDE_FLOOR) return false;                         /* below the shared floor */
-    if(isLong ? !(a > b) : !(a >= b)) return false;           /* belongs to the other table */
+    if(!(a > b)) return false;                               /* this side must be strictly stronger */
     if(q && !(r.symbol.toLowerCase().includes(q)||(r.sector||'').toLowerCase().includes(q))) return false;
     if(rvMin!==null && (r.rvol??0) < rvMin) return false;
-    if(minA!==null && a < minA) return false;
-    if(maxB!==null && b > maxB) return false;
+    if(otherMax!==null && b > otherMax) return false;        /* the ≤ cap for this table */
     return true;
   });
 
@@ -613,10 +610,10 @@ function renderTable(rows){
     if(S.data) renderTable(S.data.universe);
   });
 });
-['q','fRvol','fLongMin','fShortMax','fShortMin','fLongMax']
+['q','fRvol','fShortMax','fLongMax']
   .forEach(id=>$(id).addEventListener('input',()=>S.data&&renderTable(S.data.universe)));
 $('fReset').onclick=()=>{
-  ['fRvol','fLongMin','fShortMax','fShortMin','fLongMax'].forEach(id=>$(id).value='');
+  ['fRvol','fShortMax','fLongMax'].forEach(id=>$(id).value='');
   if(S.data) renderTable(S.data.universe);
 };
 
