@@ -247,10 +247,29 @@ times are the minutes a filter was **satisfied**, not when the live page happene
 dated URL, which route is chosen for a finished session vs the current one, a full
 collect → replay → report run, and the refusals the build endpoint must make.
 
-## 10. Honest notes
+## 10. Chart popup — tap a stock's name
+
+Tapping any symbol in either table opens a chart popup: an embedded TradingView chart on
+`NSE:<symbol>`, dark, 5-minute by default, with **15m / 1H / 1D** chips and a link out to
+`tradingview.com/chart/?symbol=NSE:<symbol>` for the same stock. Esc, the ✕ or a tap outside
+closes it and unloads the widget (nothing keeps polling TradingView in the background).
+
+TradingView only lets you have one half of "my own indicators", so be clear about which:
+
+- the **embedded widget is anonymous** — it cannot sign into your account, so the layout you
+  saved on TradingView (your indicators, colours, drawings) does **not** load inside it. It
+  gives you the standard chart, with TradingView's own indicator menu in its toolbar.
+- the **link out is your account** — it opens tradingview.com in a new tab, logged in as you,
+  where your saved layout *does* load, with the symbol already switched.
+
+So: quick look in the popup, your real setup one click away.
+
+## 11. Honest notes
 
 - Picks are **intraday ideas for the current session** — square off before 15:15–15:30 IST unless you deliberately carry over.
 - These are **futures** trades: contract and lot size are on each card, and margins apply. Risk per lot is shown so you can size properly.
 - Scores are relative: on a dead, choppy day everything scores lower and you may get 1–2 names, not 10. That is intentional.
 - The engine uses cash-market candles for VWAP/levels (the standard reference) and futures quotes for OI and the tradeable price; the card shows both.
 - Educational/analysis tool, **not investment advice**. Paper-trade it for a few sessions before risking money.
+- The chart popup cannot carry your saved TradingView layout: a widget has no login. The
+  **Open in TradingView ↗** link inside the popup is the one that shows your own indicators.
