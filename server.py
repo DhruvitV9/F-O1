@@ -166,7 +166,9 @@ def start_engine(mode: str, token: str = ""):
                 except UpstoxError as e:
                     msg = e.friendly()
                     STATE["last_error"] = msg
-                    if e.status in (401, 403) or "token" in msg.lower():
+                    # A network failure is transient — keep retrying. Only a real
+                    # rejection (401/403) or an explicit token complaint stops the loop.
+                    if not e.network and (e.status in (401, 403) or "token" in msg.lower()):
                         STATE["auth_error"] = msg
                         STATE["stop"].set()   # stop hammering an invalid token
                 except Exception as e:        # noqa: BLE001
