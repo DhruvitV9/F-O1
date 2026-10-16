@@ -207,12 +207,12 @@
   .chg{padding:2px 7px;border-radius:6px;font-weight:700;font-size:11.5px}
   .chg.up{background:var(--upbg)} .chg.dn{background:var(--dnbg)}
   .chg.dim{background:rgba(148,170,210,.08)}
-  .seen{text-align:right}
+  /* left-aligned on purpose: it sits next to the symbol, reading as the row's
+     "opened at" stamp rather than a number to compare down the column */
+  .seen{text-align:left}
   .seen .st{display:block;font-weight:600;font-size:11.5px;color:#cdd8ee}
   .seen .sa{display:block;font-size:10px;color:var(--dim2);letter-spacing:.2px}
   .seen .sa.fresh{color:#c4b5fd}
-  .rngcell{width:74px}
-  .rngcell .rng{height:4px}
   .empty{background:var(--panel);border:1px dashed var(--line2);border-radius:var(--r);padding:26px;
     text-align:center;color:var(--dim);font-size:13px}
   .legend{display:flex;gap:12px;flex-wrap:wrap;font-size:10.5px;color:var(--dim2);margin-top:8px}
@@ -270,7 +270,7 @@
     .logo{width:26px;height:26px;font-size:13px}
     #btnRefresh,#btnSettings{padding:8px 11px;font-size:12.5px}
     .tblwrap{max-height:64vh}
-    .rngcell,.legend{display:none}
+    .legend{display:none}
     .heat .hc{min-width:88px}
   }
 </style>
@@ -352,13 +352,12 @@
       <div class="tblwrap">
         <table id="tblLong">
           <thead><tr>
-            <th data-k="symbol">Symbol</th><th data-k="sector">Sector</th>
-            <th data-k="ltp">LTP</th><th data-k="pct_chg">Chg %</th>
-            <th data-k="rvol">RVOL</th><th data-k="oi_chg">OI Δ%</th>
-            <th data-k="turnover_cr">Turnover ₹cr</th><th data-k="atr_pct">ATR%</th>
-            <th data-k="range_pos">Day range</th>
-            <th data-k="score_long">Long</th><th data-k="score_short">Short</th>
+            <th data-k="symbol">Symbol</th>
             <th title="First time this stock entered this table under the current filter setting">First seen</th>
+            <th data-k="ltp">LTP</th><th data-k="pct_chg">Chg %</th>
+            <th data-k="score_long">Long</th><th data-k="score_short">Short</th>
+            <th data-k="rvol">RVOL</th><th data-k="oi_chg">OI Δ%</th>
+            <th data-k="atr_pct">ATR%</th>
           </tr></thead>
           <tbody></tbody>
         </table>
@@ -374,13 +373,12 @@
       <div class="tblwrap">
         <table id="tblShort">
           <thead><tr>
-            <th data-k="symbol">Symbol</th><th data-k="sector">Sector</th>
-            <th data-k="ltp">LTP</th><th data-k="pct_chg">Chg %</th>
-            <th data-k="rvol">RVOL</th><th data-k="oi_chg">OI Δ%</th>
-            <th data-k="turnover_cr">Turnover ₹cr</th><th data-k="atr_pct">ATR%</th>
-            <th data-k="range_pos">Day range</th>
-            <th data-k="score_long">Long</th><th data-k="score_short">Short</th>
+            <th data-k="symbol">Symbol</th>
             <th title="First time this stock entered this table under the current filter setting">First seen</th>
+            <th data-k="ltp">LTP</th><th data-k="pct_chg">Chg %</th>
+            <th data-k="score_long">Long</th><th data-k="score_short">Short</th>
+            <th data-k="rvol">RVOL</th><th data-k="oi_chg">OI Δ%</th>
+            <th data-k="atr_pct">ATR%</th>
           </tr></thead>
           <tbody></tbody>
         </table>
@@ -721,20 +719,17 @@ function renderSide(rows, side){
     const rvCls = rv>=3 ? 'rvmax' : (rv>=1.8 ? 'rvhot' : '');
     return `<tr class="${fresh?'fresh':''}">
     <td><span class="symc"><b>${r.symbol}</b>${fresh?'<span class="badge new">NEW</span>':''}${r.deep?'<span class="deepp" title="1-min analysed">●</span>':''}</span></td>
-    <td class="dim">${r.sector}</td>
+    <td class="seen"><span class="st">${ist12(isoHM(first))}</span>
+        <span class="sa ${fresh?'fresh':''}">${ageLabel(secs)}</span></td>
     <td class="mono ${fl}">${fmt(r.ltp)}</td>
     <td>${chgChip(r.pct_chg)}</td>
-    <td class="${rvCls}">${fmt(rv,1)}x</td>
-    <td>${oiCell(r.oi_chg)}</td>
-    <td>${fmt(r.turnover_cr,0)}</td>
-    <td>${fmt(r.atr_pct,1)}%</td>
-    <td class="rngcell">${rangeBar(r.range_pos, r.day_low, r.day_high)}</td>
     <td>${scoreBar(r.score_long,false)}</td>
     <td>${scoreBar(r.score_short,true)}</td>
-    <td class="seen"><span class="st">${ist12(isoHM(first))}</span>
-        <span class="sa ${fresh?'fresh':''}">${ageLabel(secs)}</span></td></tr>`;
+    <td class="${rvCls}">${fmt(rv,1)}x</td>
+    <td>${oiCell(r.oi_chg)}</td>
+    <td>${fmt(r.atr_pct,1)}%</td></tr>`;
   }).join('')
-  : `<tr><td colspan="12" style="text-align:center;color:var(--dim);padding:22px">
+  : `<tr><td colspan="9" style="text-align:center;color:var(--dim);padding:22px">
       ${isLong?'No long setup clears the bar right now.':'No short setup clears the bar right now.'}
       <br><span style="font-size:11.5px">Clear the boxes above to see more.</span></td></tr>`;
 
