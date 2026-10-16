@@ -92,6 +92,7 @@ header{display:flex;align-items:center;gap:12px;flex-wrap:wrap;
 .btn{background:var(--panel2);color:var(--dim);border:1px solid var(--line2);border-radius:8px;
   padding:6px 10px;font-size:12px;cursor:pointer}
 .btn:hover{color:var(--txt);border-color:var(--acc)}
+.btn.on{color:#cfe0ff;border-color:rgba(76,141,255,.55);background:rgba(76,141,255,.14)}
 .who{font-size:12px;color:var(--dim2);margin-left:auto}
 
 /* ---- kpis ---- */
@@ -369,16 +370,25 @@ function applyPreset(p){
   document.getElementById('fLongMax').value = p[3] === null ? '' : p[3];
   render();
 }
+function markPreset(){
+  const rv = num('fRvol'), cl = num('fShortMax'), cs = num('fLongMax');
+  [...document.querySelectorAll('#presets .btn')].forEach((b, i) => {
+    const p = PRESETS[i];
+    b.classList.toggle('on', p[1] === rv && p[2] === cl && p[3] === cs);
+  });
+}
 function initControls(){
   const box = document.getElementById('presets');
   PRESETS.forEach(p => {
     const b = document.createElement('button');
-    b.className = 'btn'; b.textContent = p[0]; b.onclick = () => applyPreset(p);
+    b.className = 'btn'; b.textContent = p[0];
+    b.onclick = () => { applyPreset(p); markPreset(); };
     box.appendChild(b);
   });
   ['fRvol', 'fShortMax', 'fLongMax', 'q'].forEach(id =>
-    document.getElementById(id).addEventListener('input', render));
+    document.getElementById(id).addEventListener('input', () => { markPreset(); render(); }));
   matrix();
+  markPreset();
   render();
 }
 document.addEventListener('DOMContentLoaded', initControls);
@@ -418,7 +428,7 @@ __CSS__
     </p>
     <div class="controls" style="margin:0">
       <div class="field"><label for="fRvol">RVOL ≥</label>
-        <input id="fRvol" type="number" min="0" step="0.1" placeholder="any"></div>
+        <input id="fRvol" type="number" min="0" step="0.1" placeholder="any" value="1.5"></div>
       <div class="field long"><label for="fShortMax"><b>Short</b> ≤</label>
         <input id="fShortMax" type="number" min="0" step="1" placeholder="any"></div>
       <div class="field short"><label for="fLongMax"><b>Long</b> ≤</label>
