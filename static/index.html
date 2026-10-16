@@ -71,6 +71,14 @@
   button.ghost{background:transparent}
   button:disabled{opacity:.5;cursor:not-allowed;transform:none}
   button.mini{padding:5px 9px;font-size:11.5px}
+  /* opens the static session-replay report served at /replay — nothing to do with
+     the live feed, so it stays a plain link and can never block a refresh */
+  a.ghostlink{display:inline-flex;align-items:center;gap:6px;font:inherit;cursor:pointer;
+    border-radius:9px;border:1px solid var(--line);background:transparent;color:var(--txt);
+    padding:7px 12px;transition:.16s ease;text-decoration:none;white-space:nowrap}
+  a.ghostlink:hover{background:var(--panel2);border-color:var(--line2);transform:translateY(-1px);
+    text-decoration:none}
+  a.ghostlink .rlabel{font-size:11px;color:var(--dim2)}
 
   /* ---------- market strip ---------- */
   .strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));gap:10px;margin-bottom:12px}
@@ -285,6 +293,8 @@
     <span id="clock" class="pill mono">--:--:--</span>
     <div class="spacer"></div>
     <span id="nextUpd" class="dim" style="font-size:12px"></span>
+    <a id="btnReplay" class="ghostlink" href="/replay"
+       title="Replay a finished session: change the RVOL / cap filters and see when each stock would have first entered the tables">▤ Replay<span class="rlabel" id="replayDay"></span></a>
     <button id="btnRefresh" class="ghost">⟳ Refresh</button>
     <button id="btnSettings">⚙ Settings</button>
   </header>
@@ -499,6 +509,12 @@ const sgn = n => (n>0?'+':'') + fmt(n,2);
 const cls = n => n>0?'up':(n<0?'dn':'dim');
 const clamp = (v,a,b) => Math.max(a,Math.min(b,v));
 /* "20:59:10" -> "8:59:10 PM"  (India runs a 12-hour clock in everyday use) */
+/* 2026-10-16 -> 16 Oct, for the Replay button label */
+function shortDay(iso){
+  const d = new Date(String(iso)+'T00:00:00');
+  if(isNaN(d)) return String(iso);
+  return d.getDate()+' '+['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()];
+}
 function ist12(hms){
   const m = /^(\d{1,2}):(\d{2})(?::(\d{2}))?$/.exec((hms||'').trim());
   if(!m) return '--:--:--';
@@ -770,6 +786,13 @@ function render(d){
     : 'MARKET '+ (m.state||'').toUpperCase().replace('-',' ');
   const secs = Math.max(0,(d.settings?.refresh_sec||20) - ((Date.now()-new Date(d.server_time_ist).getTime())/1000));
   $('nextUpd').textContent = open ? 'next update ~'+Math.round(secs)+'s' : '';
+  /* the Replay button opens the newest session-replay report (a static page at
+     /replay); label it with that session so it is obvious what you will see */
+  const rp = (d.app && d.app.replay) || null;
+  $('replayDay').textContent = rp && rp.session ? ' · '+shortDay(rp.session) : '';
+  $('btnReplay').title = rp && rp.session
+    ? `Replay ${rp.session}: change the RVOL / cap filters and see when each stock would have first entered the tables`
+    : 'Replay a finished session: change the RVOL / cap filters and see when each stock first entered the tables (run replay.py to build one)';
 
   /* banners */
   let b='';

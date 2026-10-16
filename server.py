@@ -281,6 +281,28 @@ python3 replay_report.py</pre>
 </div></body></html>"""
 
 
+def replay_info() -> dict:
+    """Newest session-replay report on disk, so the UI can label the Replay button.
+
+    Reports are static HTML written by replay_report.py; this only reports what
+    exists and never builds anything.
+    """
+    try:
+        reports = glob.glob(os.path.join(BASE, "logs", "replay", "report_*.html"))
+    except OSError:
+        return {}
+    if not reports:
+        return {}
+    newest = max(reports, key=os.path.getmtime)
+    name = os.path.basename(newest)
+    sess = name[len("report_"):-len(".html")] if name.startswith("report_") else ""
+    try:
+        built = datetime.fromtimestamp(os.path.getmtime(newest), IST).isoformat(timespec="seconds")
+    except OSError:
+        built = ""
+    return {"session": sess, "built": built, "file": name}
+
+
 def ui_version() -> str:
     """Short hash of the current index.html — changes whenever the UI changes."""
     try:
@@ -312,7 +334,9 @@ def api_snapshot(host_header: str = "") -> dict:
                    # Set only when UPSTOX_API_ROOT points away from Upstox itself.
                    # The UI warns loudly in that case, so a stand-in feed can never
                    # be mistaken for real market data.
-                   "custom_api_root": CUSTOM_API_ROOT}
+                   "custom_api_root": CUSTOM_API_ROOT,
+                   # Session the /replay report covers, if one has been built.
+                   "replay": replay_info()}
     return data
 
 
