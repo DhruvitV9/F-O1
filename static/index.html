@@ -4,6 +4,8 @@
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
 <meta name="theme-color" content="#070a10"/>
+<!-- replaced with a content hash by server.py when the page is served -->
+<meta name="ui-version" content="__UI_VERSION__"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black"/>
@@ -868,13 +870,30 @@ function render(d){
     ${(st.errors&&st.errors.length)?'<br>last errors:<br>'+st.errors.slice(-3).map(e=>'• '+e).join('<br>'):''}`;
 }
 
+/* Which version of the page this tab actually loaded. The server stamps a hash
+   of index.html into the meta tag above, so an open tab can tell when the file
+   on disk has changed and refresh itself instead of silently re-rendering an
+   out-of-date table forever. */
+const UI_VERSION = (document.querySelector('meta[name="ui-version"]')||{}).content || '';
+
 /* ---------------- polling ---------------- */
 async function poll(delay=0){
   if(delay) await new Promise(r=>setTimeout(r,delay));
   try{
     const r=await fetch('/api/snapshot',{cache:'no-store'});
     const j=await r.json();
-    if(j.ok) render(j);
+    if(j.ok){
+      const sv=(j.app&&j.app.ui_version)||'';
+      if(!S.reloading && sv && UI_VERSION && UI_VERSION!=='__UI_VERSION__' && sv!==UI_VERSION){
+        /* only when both sides are known hashes and they disagree, so the
+           unstamped page used by the tests never triggers a reload loop */
+        S.reloading=true;
+        toast('This page is out of date — refreshing…', 3000);
+        setTimeout(()=>location.reload(), 1200);
+      } else if(!S.reloading){
+        render(j);
+      }
+    }
   }catch(e){ /* keep last view */ }
   const every=(S.data&&S.data.settings&&S.data.settings.refresh_sec)?S.data.settings.refresh_sec:20;
   clearTimeout(S.timer);

@@ -258,6 +258,15 @@ def auth_status(host_header: str = "") -> dict:
 
 
 # ------------------------------------------------------------------------ API
+def ui_version() -> str:
+    """Short hash of the current index.html — changes whenever the UI changes."""
+    try:
+        with open(os.path.join(STATIC, "index.html"), "rb") as f:
+            return hashlib.sha1(f.read()).hexdigest()[:12]
+    except OSError:
+        return ""
+
+
 def api_snapshot(host_header: str = "") -> dict:
     with STATE["lock"]:
         eng, mode = STATE["engine"], STATE["mode"]
@@ -275,6 +284,8 @@ def api_snapshot(host_header: str = "") -> dict:
     data["auth"] = auth_status(host_header)
     data["app"] = {"password_gate": auth_enabled(),
                    "persistent_dirs": {"cache": CACHE, "logs": LOGS, "runtime": RUNTIME},
+                   # Lets an open tab notice that the UI on disk has changed.
+                   "ui_version": ui_version(),
                    # Set only when UPSTOX_API_ROOT points away from Upstox itself.
                    # The UI warns loudly in that case, so a stand-in feed can never
                    # be mistaken for real market data.
@@ -489,7 +500,13 @@ class Handler(BaseHTTPRequestHandler):
             fp = os.path.join(STATIC, "index.html")
             try:
                 with open(fp, "rb") as f:
-                    return self._send(f.read(), 200, "text/html")
+                    body = f.read()
+                # Stamp the page with a hash of its own content. An open tab keeps
+                # rebuilding its table from /api/snapshot using the template it was
+                # loaded with, so without this a stale tab never notices new code.
+                ver = ui_version().encode()
+                body = body.replace(b"__UI_VERSION__", ver)
+                return self._send(body, 200, "text/html")
             except OSError:
                 return self._send({"ok": False, "error": "index.html missing"}, 500)
         if path == "/api/snapshot":
