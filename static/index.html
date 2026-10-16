@@ -248,7 +248,6 @@
     <div class="tile"><div class="k">BANK NIFTY</div><div class="v" id="bankV">—</div><div class="s" id="bankS">—</div></div>
     <div class="tile"><div class="k">INDIA VIX</div><div class="v" id="vixV">—</div><div class="s" id="vixS">—</div></div>
     <div class="tile"><div class="k">Market Breadth</div><div class="v" id="brV">—</div><div class="s" id="brS">—</div></div>
-    <div class="tile"><div class="k">Stocks Scanned</div><div class="v" id="scanV">—</div><div class="s" id="scanS">—</div></div>
   </div>
 
   <div class="regime">
@@ -263,32 +262,11 @@
 
   <div class="phasebar" id="phasebar"></div>
 
-  <div class="funnel" id="funnel"></div>
-
   <div class="tabs">
-    <div class="tab on" data-pane="picks">🎯 Top Picks</div>
-    <div class="tab" data-pane="all">📋 All F&amp;O Stocks</div>
-    <div class="tab" data-pane="playbook">📗 How to trade it</div>
-    <div class="tab" data-pane="how">📘 Behind the scenes</div>
+    <div class="tab on" data-pane="all">📋 All F&amp;O Stocks</div>
   </div>
 
-  <div class="pane on" id="pane-picks">
-    <div class="tbar">
-      <label class="dim" style="font-size:12.5px"><input type="checkbox" id="onlyReady" style="width:auto">
-        show only <b>actionable</b> (READY) picks</label>
-      <span class="dim" style="font-size:12px" id="readyHint"></span>
-    </div>
-    <div class="sect">
-      <h2>▲ Top Longs <span class="cnt" id="cntLong"></span></h2>
-      <div class="grid" id="gridLong"></div>
-    </div>
-    <div class="sect">
-      <h2>▼ Top Shorts <span class="cnt" id="cntShort"></span></h2>
-      <div class="grid" id="gridShort"></div>
-    </div>
-  </div>
-
-  <div class="pane" id="pane-all">
+  <div class="pane on" id="pane-all">
     <div class="tbar">
       <input type="text" id="q" placeholder="Search symbol or sector…"/>
       <label class="dim" style="font-size:12.5px"><input type="checkbox" id="onlyTrade" style="width:auto"> only tradeable</label>
@@ -308,125 +286,6 @@
     </div>
   </div>
 
-  <div class="pane" id="pane-playbook">
-    <div class="doc">
-      <h3>Read this once, then follow the chips</h3>
-      <p>Every card carries a verdict button — <b>READY</b>, <b>WAIT</b>, <b>LATE</b>, <b>SKIP</b> — computed from the
-      score, volume pace, VWAP position, how extended the move is, how long the pick has held, whether price is still
-      near the entry, the market regime and the time of day. <b>Only READY means act.</b> Tap the verdict to see the
-      eight checks behind it.</p>
-
-      <h3>1 · When to trade (the phase bar)</h3>
-      <ul>
-        <li><b>09:15–09:30 Avoid</b> — opening range is forming. Read the list, trade nothing.</li>
-        <li><b>09:30–10:15 Prime</b> — the best window for BREAKOUT / BREAKDOWN entries. Volume is real, ranges are set.</li>
-        <li><b>10:15–11:30 Good</b> — trend continuation. BUY NOW / pullback entries work.</li>
-        <li><b>11:30–13:30 Choppy</b> — lunchtime. Only A+ setups, expect false breakouts.</li>
-        <li><b>13:30–14:45 Prime</b> — the afternoon move often decides the day. Fresh breakouts are tradeable.</li>
-        <li><b>14:45–15:15 Manage</b> — no new trades. Trail stops, bank profits.</li>
-        <li><b>15:15–15:30 Exit</b> — square off. F&amp;O intraday positions must be closed.</li>
-      </ul>
-
-      <h3>2 · Which stock, when two look equally good</h3>
-      <ol>
-        <li><b>Highest score wins</b> — but only if it is READY.</li>
-        <li><b>Stability beats freshness.</b> A pick that has held its place for 20+ minutes, with a steady or rising score
-            and a good <i>best rank</i>, is far more trustworthy than one that just appeared. Fresh picks are marked.</li>
-        <li><b>Prefer same-direction as the market.</b> On a Risk-Off day, the best short beats the best long.</li>
-        <li><b>Prefer the sector that's moving.</b> Look at the strongest/weakest sectors in the header — a stock riding its
-            sector has a tailwind.</li>
-        <li><b>Prefer real build-up over covering.</b> "Fresh long/short build-up (OI up with price)" keeps going.
-            "Short covering" rallies fade.</li>
-        <li><b>Take one, not five.</b> If two picks are in the same sector, they will behave alike — you'd just be doubling risk.</li>
-      </ol>
-
-      <h3>3 · How to enter (never chase)</h3>
-      <ul>
-        <li>Use the <b>Entry</b> box and the mode line:
-          <b>BREAKOUT</b> = buy strength above the day high · <b>BUY NOW</b> = price is just above VWAP support ·
-          <b>BUY DIP</b> = wait for the pullback to the entry zone · <b>RECLAIM</b> = only after it gets back above VWAP.</li>
-        <li>If price is already more than <b>0.6R past the entry</b>, the card says <b>LATE</b> — don't chase it, wait for a
-            pullback to the entry zone.</li>
-        <li>If the price never reaches your entry zone, you take <b>no trade</b>. Missing a move costs nothing.</li>
-        <li>Place the stop <b>at the same time</b> as the entry. The stop is structural, not a suggestion.</li>
-      </ul>
-
-      <h3>4 · How to exit</h3>
-      <ul>
-        <li>At <b>T1</b>: book half, and move the stop to breakeven (the app tracks this as WORKING → RUNNING).</li>
-        <li>At <b>T2</b>: book the rest, or trail the stop under each new 5-minute higher low / above each lower high.</li>
-        <li><b>Stop = exit.</b> No averaging down, no "it'll come back". The status flips to STOPPED and the pick is done.</li>
-        <li><b>Time stop:</b> if it hasn't reached T1 within ~45–60 minutes and volume is fading, take what's there and go.</li>
-        <li>If the card flips to <b>FADING</b> or the score drops hard for 2–3 refreshes, tighten up or exit.</li>
-      </ul>
-
-      <h3>5 · Position sizing (the part that keeps you alive)</h3>
-      <p>Each card shows <b>risk per lot</b> in ₹. Decide the most you're willing to lose on one trade — say ₹5,000 —
-      then <code>lots = 5000 ÷ risk_per_lot</code>. Round <b>down</b>. Two trades a day maximum, and if the first two lose,
-      stop for the day.</p>
-
-      <h3>6 · Why the list keeps changing (and what to do about it)</h3>
-      <p>Scores are a live read of momentum, so names will shuffle as the tape moves — that's normal. The discipline is:</p>
-      <ul>
-        <li><b>Don't re-pick every refresh.</b> <span class="wn">Decide once per phase</span>: pick your 1–2 names in the
-            09:30–10:15 window (and again after 13:30). Between those windows, only manage what you hold.</li>
-        <li><b>A pick that disappears is information</b>, not a trade signal. Something better replaced it, or its momentum
-            died — either way, you don't chase the newcomer mid-move.</li>
-        <li><b>Ignore anything marked fresh</b> unless it is also READY for 2+ refreshes in a row.</li>
-        <li><b>Don't flip sides casually.</b> If the regime bar says Risk-Off and you're holding a long that still shows
-            READY, you can keep it — but stop opening new longs.</li>
-      </ul>
-
-      <h3>7 · A day in practice</h3>
-      <ol>
-        <li>09:10 — token pasted, warm-up done before the bell. Read the regime and sector leaders.</li>
-        <li>09:30 — open the Top Picks tab, tick <b>actionable only</b>. Read the READY cards' eight checks.</li>
-        <li>09:35 — take at most one; enter only in the stated zone; stop on immediately.</li>
-        <li>10:30 — if it's at T1, book half and trail. If it's FADING with no volume, exit flat.</li>
-        <li>13:30 — second look: only if you're flat and something is READY.</li>
-        <li>14:45 — stop trading. Manage or exit. </li>
-        <li>15:10 — everything closed. Skim <code>logs/live/picks_*.csv</code> to see how your picks actually did.</li>
-      </ol>
-      <p class="note">Educational tool, not investment advice. Paper-trade this routine for a few sessions before risking money.</p>
-    </div>
-  </div>
-
-  <div class="pane" id="pane-how">
-    <div class="doc">
-      <h3>What this does</h3>
-      <p>Every refresh cycle it pulls live quotes for <b>all 210 NSE stock-F&amp;O underlyings</b> (plus their futures for
-      open-interest), then runs a two-stage funnel so you only ever look at the 4–5 best ideas on each side.</p>
-      <h3>The funnel</h3>
-      <ol>
-        <li><b>Snapshot</b> — one batch call for all 210 stocks: price, change, day range position, volume, open interest, bid/ask, circuits.</li>
-        <li><b>Pre-score</b> — every stock is scored cheaply on relative strength vs NIFTY, range position, volume pace (RVOL), OI build-up and where it sits versus yesterday's high/low.</li>
-        <li><b>Deep scan</b> — the top candidates get 1-minute candles so the engine can compute day VWAP, opening-range breakouts, 5-min EMA slope, RSI and volume bursts.</li>
-        <li><b>Hard gates</b> — thrown out if liquidity (pace-adjusted turnover), spread, ATR, price, or circuit proximity is wrong, or the stock is on your ban list.</li>
-        <li><b>Final score</b> — weighted composite; top 5 longs + top 5 shorts published, max 2 per sector so you don't get five banks.</li>
-      </ol>
-      <h3>Score weights</h3>
-      <p>Relative strength 22% · momentum &amp; intraday structure 20% · level/breakout structure 18% · volume confirmation 13%
-      · open-interest build-up 12% · trade setup quality (R:R, stop width) 10% · market + sector alignment 5%.</p>
-      <p>Penalties: extended far from VWAP, near circuit, wide spread, rally driven only by short covering.</p>
-      <h3>Trade plan on each card</h3>
-      <ul>
-        <li><b>Entry</b> — either a breakout level, the current price just above VWAP support, or a pullback zone. The card says which.</li>
-        <li><b>Stop loss</b> — the tightest sensible structural level (below VWAP / opening range / day low), floored so it isn't noise-width.</li>
-        <li><b>T1 / T2</b> — 1R and 2R, snapped to real levels (yesterday's high/low, 20-day breakout) when they are closer.</li>
-        <li><b>Risk per lot</b> — stop distance × lot size, so you can size the position without mental maths.</li>
-      </ul>
-      <h3>The market regime switch</h3>
-      <p>The header shows whether the tape is Risk-On, Risk-Off or Chop from index trend, breadth and VWAP position.
-      The favoured side needs a lower score to qualify; the other side is held to a higher bar automatically.</p>
-      <h3>Practical notes</h3>
-      <ul>
-        <li>Picks are intraday ideas for the current session — exit before 15:15–15:30 IST unless you are deliberately carrying.</li>
-        <li>This trades futures (F&amp;O); the futures contract and lot size are on every card. Margins apply.</li>
-        <li>Your access token expires daily (~3:30 AM IST). Paste a fresh one in Settings each morning.</li>
-        <li>Educational/analysis tool, not investment advice. Test it on paper first.</li>
-      </ul>
-    </div>
-  </div>
 </div>
 
 <div class="scrim" id="scrim"></div>
@@ -640,83 +499,6 @@ function fillSettings(){
   $('s_shorts').checked=s.show_shorts!==false; $('s_ban').value=(s.ban_list||[]).join(', ');
 }
 
-/* ---------------- sparkline ---------------- */
-function spark(vals, up){
-  if(!vals||vals.length<3) return '';
-  const w=320,h=38,p=3, mn=Math.min(...vals), mx=Math.max(...vals), rg=(mx-mn)||1;
-  const pts=vals.map((v,i)=>[p+i*(w-2*p)/(vals.length-1), h-p-((v-mn)/rg)*(h-2*p)]);
-  const d=pts.map((pt,i)=>(i?'L':'M')+pt[0].toFixed(1)+' '+pt[1].toFixed(1)).join(' ');
-  const col=up?'#22c55e':'#ef4444';
-  const last=pts[pts.length-1];
-  return `<svg class="spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" style="width:100%">
-    <path d="${d} L ${last[0]} ${h} L ${pts[0][0]} ${h} Z" fill="${col}" opacity=".10"/>
-    <path d="${d}" fill="none" stroke="${col}" stroke-width="1.8" stroke-linejoin="round"/>
-    <circle cx="${last[0]}" cy="${last[1]}" r="2.6" fill="${col}"/></svg>`;
-}
-
-/* ---------------- cards ---------------- */
-function scoreCls(v){ return v>=72?'hi':(v>=62?'md':'lo'); }
-function card(p){
-  const l=p.levels, dir=p.direction;
-  const badge = p.since_flagged_pct!==null && Math.abs(p.since_flagged_pct)<0.05 && p.status==='WATCH'
-      ? '<span class="badge new">NEW</span>' : '';
-  const why = p.why.map(w=>`<li><span class="b">${dir==='long'?'▲':'▼'}</span><span>${w}</span></li>`).join('');
-  const risks = (p.risks&&p.risks.length)?`<div class="risk">⚠ ${p.risks.join(' · ')}</div>`:'';
-  return `<div class="card ${dir}">
-    <div class="top">
-      <div class="rank">${p.rank}</div>
-      <div>
-        <div class="sym">${p.symbol} ${badge}</div>
-        <div class="sub">${p.sector} · ${p.fut_symbol||''} · lot ${p.lot_size}</div>
-      </div>
-      <div class="score"><div class="n ${scoreCls(p.score)}">${p.score}</div><div class="l">score</div></div>
-    </div>
-    <div class="px">
-      <span class="now">${money(p.ltp)}</span>
-      <span class="chg ${cls(p.pct_chg)}">${sgn(p.pct_chg)}%</span>
-      <span class="vs">vs NIFTY ${sgn(p.rel_strength)}%</span>
-      <span class="vs">· fut ${money(p.fut_ltp)}</span>
-    </div>
-    ${spark(p.spark, dir==='long')}
-    <div class="lvl">
-      <div class="entry"><div class="k">Entry</div><div class="v">${fmt(l.entry)}</div></div>
-      <div class="sl"><div class="k">Stop</div><div class="v">${fmt(l.sl)}</div></div>
-      <div class="t"><div class="k">T1</div><div class="v">${fmt(l.t1)}</div></div>
-      <div class="t"><div class="k">T2</div><div class="v">${fmt(l.t2)}</div></div>
-    </div>
-    <div class="meta">
-      <span>R:R <b>1:${fmt(l.rr,1)}</b></span>
-      <span>risk <b>${fmt(l.risk_pct,2)}%</b></span>
-      <span>risk/lot <b>₹${fmt(l.risk_per_lot,0)}</b></span>
-      <span>RVOL <b>${fmt(p.rvol,1)}x</b></span>
-      <span>OI Δ <b class="${cls(p.oi_chg_pct)}">${sgn(p.oi_chg_pct)}%</b></span>
-      <span>turnover <b>₹${fmt(p.turnover_cr,0)}cr</b></span>
-    </div>
-    <div class="ready" onclick="this.parentNode.classList.toggle('open')" title="Tap to see the checks">
-      <span class="v v-${(p.readiness&&p.readiness.verdict||'WAIT').replace(' ','')}">${p.readiness?p.readiness.verdict:'—'}</span>
-      <span class="r">${p.readiness?p.readiness.reason:''}</span>
-    </div>
-    <div class="checks">
-      ${(p.readiness&&p.readiness.checks||[]).map(c=>`<div class="chk ${c.ok?'ok':'no'}">
-        <span class="i">${c.ok?'✓':'✕'}</span><span><b>${c.name}</b> — ${c.detail}</span></div>`).join('')}
-    </div>
-    <ul class="why">${why}</ul>
-    ${risks}
-    <div class="stab">
-      <span>on list <b>${p.stability?p.stability.on_list_min.toFixed(0):0} min</b></span>
-      <span>best rank <b>#${p.stability?p.stability.best_rank:'—'}</b></span>
-      <span>score <b>${p.stability?p.stability.score_trend:'—'}</b> (peak ${p.stability?p.stability.score_peak:'—'})</span>
-      <span>since flagged <b class="${cls(p.since_flagged_pct)}">${sgn(p.since_flagged_pct)}%</b></span>
-      <button class="mini copyplan" onclick="copyPlan('${p.symbol}','${p.direction}')">copy plan</button>
-    </div>
-    <div class="foot">
-      <span class="badge b-${p.status}">${p.status}</span>
-      <span title="${l.mode}">${l.mode.split('—')[0].trim()}</span>
-      <span>· since flagged <b class="${cls(p.since_flagged_pct)}">${sgn(p.since_flagged_pct)}%</b></span>
-      <span>· ${p.r_now>=0?'+':''}${fmt(p.r_now,2)}R</span>
-    </div>
-  </div>`;
-}
 
 /* ---------------- table ---------------- */
 function renderTable(rows){
@@ -751,16 +533,7 @@ document.querySelectorAll('#tbl th').forEach(th=>th.onclick=()=>{
   renderTable(S.data.universe);
 });
 ['q','onlyTrade','onlyScored'].forEach(id=>$(id).addEventListener('input',()=>S.data&&renderTable(S.data.universe)));
-$('onlyReady').addEventListener('change',()=>S.data&&render(S.data));
 
-/* ---------------- copy a one-line trade plan ---------------- */
-function copyPlan(sym, dir){
-  const p = (S.picks && (S.picks[dir]||[]).find(x=>x.symbol===sym)) || null;
-  if(!p) return toast('Pick not available');
-  const l = p.levels;
-  const txt = `${p.symbol} ${dir==='long'?'LONG (buy fut)':'SHORT (sell fut)'} @ ${l.entry} | SL ${l.sl} | T1 ${l.t1} | T2 ${l.t2} | risk ${l.risk_pct}% | Rs${Math.round(l.risk_per_lot)}/lot | ${p.fut_symbol}`;
-  navigator.clipboard.writeText(txt).then(()=>toast('✓ Plan copied: '+txt.slice(0,60)+'…'),()=>toast(txt,9000));
-}
 
 /* ---------------- main render ---------------- */
 function render(d){
@@ -810,8 +583,6 @@ function render(d){
   $('brV').textContent = br!=null?fmt(br,0)+'% up':'—';
   $('brV').className='v '+(br>55?'up':br<45?'dn':'');
   $('brS').textContent = (c.adv??0)+' advancing · '+(c.dec??0)+' declining';
-  $('scanV').textContent = (st.scanned??0)+' / '+(st.total??210);
-  $('scanS').textContent = 'deep-scanned '+ (st.deep_scanned??0) +' · coverage '+(st.coverage_pct??0)+'%';
   const bb=$('brBar'); if(br!=null) bb.innerHTML=`<div class="g" style="width:${br}%"></div><div class="r" style="width:${100-br}%"></div>`;
   $('regimeTag').textContent = (c.regime||'—') + (c.bias && c.bias!=='neutral' ? ' · '+(c.bias==='long'?'long bias':'short bias') : '');
   $('regimeTag').className = 'tag '+(c.regime==='Risk-On'?'riskOn':(c.regime==='Risk-Off'?'riskOff':'chop'));
@@ -838,34 +609,6 @@ function render(d){
   $('phasebar').innerHTML = `<span class="pl pl-${ph.label||'Closed'}">${(ph.label||'—').toUpperCase()}</span>
     <span style="font-size:12.5px" class="dim">${ph.note||''}${nt}</span>
     <div class="timeline">${tl}</div>`;
-
-  /* funnel */
-  const f=d.funnel||{};
-  const step=(lbl,v,tip)=>`<span class="fstep" title="${tip||''}"><span class="dim">${lbl}</span> <b>${v??'—'}</b></span>`;
-  $('funnel').innerHTML = step('F&O universe',f.all)+'<span class="farrow">→</span>'
-    + step('passing gates',f.liquid,'liquidity, spread, ATR, circuit, ban list')
-    +'<span class="farrow">→</span>'+ step('with momentum',f.momentum,'pre-score ≥ 45')
-    +'<span class="farrow">→</span>'+ step('deep 1-min scan',f.deep)
-    +'<span class="farrow">→</span>'+ step('<span class="up">final picks</span>',f.final)
-    + `<span class="spacer"></span><span class="dim2 mono" style="font-size:11px">${d.mode==='live'?'live':'demo'} · cycle ${st.cycle??0} · poll ${st.poll_seconds??'—'}s · IST ${(m.ist_hm||'')}</span>`;
-
-  /* picks */
-  const L=(d.picks&&d.picks.long)||[], Sh=(d.picks&&d.picks.short)||[];
-  $('cntLong').textContent = L.length?`— ${L.length} of ${f.liquid??0} gated stocks`:'';
-  $('cntShort').textContent = Sh.length?`— ${Sh.length} of ${f.liquid??0} gated stocks`:'';
-  S.picks = {long:L, short:Sh};
-  const onlyReady = $('onlyReady').checked;
-  const filt = ps => onlyReady ? ps.filter(p=>p.readiness && p.readiness.verdict==='READY') : ps;
-  const nrL = filt(L), nrS = filt(Sh);
-  $('readyHint').textContent = onlyReady
-    ? `${nrL.length} long / ${nrS.length} short are actionable right now`
-    : `${L.filter(p=>p.readiness&&p.readiness.verdict==='READY').length} of ${L.length} longs and ${Sh.filter(p=>p.readiness&&p.readiness.verdict==='READY').length} of ${Sh.length} shorts are READY`;
-  $('gridLong').innerHTML = L.length? (nrL.length? nrL.map(card).join('')
-      : `<div class="empty">${onlyReady?'No long is actionable this minute.':'No long setup clears the bar right now.'}<br><span class="dim">${onlyReady?'Untick “actionable only” to see what is close, or wait for the next phase.':'The engine shows nothing rather than a weak trade.'}</span></div>`)
-    : `<div class="empty">No long setup clears the bar right now.<br><span class="dim">The engine shows nothing rather than a weak trade.</span></div>`;
-  $('gridShort').innerHTML = Sh.length? (nrS.length? nrS.map(card).join('')
-      : `<div class="empty">${onlyReady?'No short is actionable this minute.':'No short setup clears the bar right now.'}<br><span class="dim">${onlyReady?'Untick “actionable only” to see what is close.':'The engine shows nothing rather than a weak trade.'}</span></div>`)
-    : `<div class="empty">No short setup clears the bar right now.<br><span class="dim">The engine shows nothing rather than a weak trade.</span></div>`;
 
   /* table */
   if(d.universe) renderTable(d.universe);
