@@ -269,9 +269,6 @@
   <div class="pane on" id="pane-all">
     <div class="tbar">
       <input type="text" id="q" placeholder="Search symbol or sector…"/>
-      <label class="dim" style="font-size:12.5px"><input type="checkbox" id="onlyTrade" style="width:auto"> only tradeable</label>
-      <label class="dim" style="font-size:12.5px"><input type="checkbox" id="onlyScored" style="width:auto"> only scored</label>
-      <span class="dim" id="rowCount" style="font-size:12.5px"></span>
     </div>
     <div class="tblwrap">
       <table id="tbl">
@@ -391,6 +388,14 @@ const fmt = (n,d=2) => (n===null||n===undefined||isNaN(n)) ? '—'
 const money = n => (n===null||n===undefined||isNaN(n)) ? '—' : '₹' + fmt(n,2);
 const sgn = n => (n>0?'+':'') + fmt(n,2);
 const cls = n => n>0?'up':(n<0?'dn':'dim');
+/* "20:59:10" -> "8:59:10 PM"  (India runs a 12-hour clock in everyday use) */
+function ist12(hms){
+  const m = /^(\d{1,2}):(\d{2})(?::(\d{2}))?$/.exec((hms||'').trim());
+  if(!m) return '--:--:--';
+  const ap = (+m[1] % 24) >= 12 ? 'PM' : 'AM';
+  const h = (+m[1] % 12) || 12;
+  return h+':'+m[2]+(m[3]?':'+m[3]:'')+' '+ap;
+}
 function toast(msg,ms=2600){const t=$('toast');t.textContent=msg;t.style.display='block';
   clearTimeout(t._h);t._h=setTimeout(()=>t.style.display='none',ms);}
 
@@ -502,13 +507,9 @@ function fillSettings(){
 
 /* ---------------- table ---------------- */
 function renderTable(rows){
-  const q=$('q').value.trim().toLowerCase(), onlyT=$('onlyTrade').checked, onlyS=$('onlyScored').checked;
-  let rs=rows.filter(r=>{
-    if(q && !(r.symbol.toLowerCase().includes(q)||(r.sector||'').toLowerCase().includes(q))) return false;
-    if(onlyT && r.gate!=='pass') return false;
-    if(onlyS && !(r.score_long||r.score_short)) return false;
-    return true;
-  });
+  const q=$('q').value.trim().toLowerCase();
+  let rs = q ? rows.filter(r=>r.symbol.toLowerCase().includes(q)||(r.sector||'').toLowerCase().includes(q))
+             : rows.slice();
   const k=S.sortK, d=S.sortDir;
   rs.sort((a,b)=>{const A=a[k]??-1e9,B=b[k]??-1e9;
     return (typeof A==='string')? d*A.localeCompare(B) : d*(A-B);});
@@ -526,13 +527,12 @@ function renderTable(rows){
     <td>${sch(r.score_long,false)}</td>
     <td>${sch(r.score_short,true)}</td>
     <td class="g-${r.gate}">${r.gate}</td></tr>`).join('');
-  $('rowCount').textContent = rs.length+' of '+rows.length+' shown';
 }
 document.querySelectorAll('#tbl th').forEach(th=>th.onclick=()=>{
   const k=th.dataset.k; if(S.sortK===k) S.sortDir*=-1; else {S.sortK=k;S.sortDir=-1;}
   renderTable(S.data.universe);
 });
-['q','onlyTrade','onlyScored'].forEach(id=>$(id).addEventListener('input',()=>S.data&&renderTable(S.data.universe)));
+$('q').addEventListener('input',()=>S.data&&renderTable(S.data.universe));
 
 
 /* ---------------- main render ---------------- */
@@ -540,7 +540,7 @@ function render(d){
   S.data=d;
   const c=d.context||{}, m=d.market||{}, st=d.stats||{};
   /* header */
-  $('clock').textContent = (m.ist_hm||'') + ' IST';
+  $('clock').textContent = ist12(m.ist_hm) + ' IST';
   $('modePill').className = 'pill '+(d.mode==='live'?'live':'demo');
   $('modePill').innerHTML = d.mode==='live'
     ? '<span class="dot"></span> LIVE · Upstox'
@@ -560,7 +560,7 @@ function render(d){
     <span class="dim">Paste your Upstox access token in <b>Settings</b> (or add your API key + secret for one-click login)
     to switch to your real live feed.</span></div></div>`;
   if(d.mode==='live' && !open) b+=`<div class="banner info">🌙 <div><b>Market is closed${m.state==='weekend'?' (weekend)':''}.</b>
-    <span class="dim">Showing the last completed session (${d.session_date}). Setups refresh when the market opens at 09:15 IST.</span></div></div>`;
+    <span class="dim">Showing the last completed session (${d.session_date}). Setups refresh when the market opens at 9:15 AM IST.</span></div></div>`;
   if(!st.warm_done && st.warm_total) {
     const pct=Math.round(100*st.warm_done_count/st.warm_total);
     b+=`<div class="banner info">⏳ <div><b>Warming up daily data ${pct}%</b>
@@ -595,8 +595,8 @@ function render(d){
 
   /* session phase bar */
   const ph = d.phase||{};
-  const segs = [["pre-open","09:15"],["open-range","09:30"],["trend","10:15"],["midday","11:30"],
-                ["afternoon","13:30"],["late","14:45"],["close","15:15"]];
+  const segs = [["pre-open","9:15 AM"],["open-range","9:30 AM"],["trend","10:15 AM"],["midday","11:30 AM"],
+                ["afternoon","1:30 PM"],["late","2:45 PM"],["close","3:15 PM"]];
   const widths = [15,45,75,120,75,45,15];
   const colorOf = k => (k==='open-range'||k==='afternoon')?'#22c55e':(k==='trend'?'#38bdf8':(k==='midday'?'#f59e0b':(k==='late'?'#fb923c':'#334155')));
   const totalW = widths.reduce((a,b)=>a+b,0);
