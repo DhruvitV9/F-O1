@@ -193,12 +193,11 @@
   .badge.new{background:rgba(139,92,246,.2);color:#c4b5fd;border:1px solid rgba(139,92,246,.4)}
   .deepp{color:var(--acc);font-size:9px}
 
-  /* the stock name is the way into the chart popup */
-  .symbtn{background:none;border:0;padding:0;margin:0;font:inherit;color:inherit;cursor:pointer;
-    border-bottom:1px dotted transparent;border-radius:3px;line-height:1.2}
-  .symbtn:hover{border-bottom-color:var(--acc);color:#fff}
-  .symbtn:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
-  body.noscroll{overflow:hidden}
+  /* the stock name is the way to your chart */
+  .symc a.symlink{color:inherit;font-weight:700;letter-spacing:.2px;font-size:12.5px;text-decoration:none;
+    border-bottom:1px dotted transparent;border-radius:3px}
+  .symc a.symlink:hover{border-bottom-color:var(--acc);color:#fff;text-decoration:none}
+  .symc a.symlink:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
 
   /* values that tick: brief flash so you can see what moved */
   @keyframes flup{0%{background:rgba(14,203,129,.34)}100%{background:transparent}}
@@ -244,32 +243,7 @@
   .banner code{background:rgba(0,0,0,.3);padding:1px 5px;border-radius:5px;font-size:11.5px}
 
   /* ---------- drawer ---------- */
-  /* ---------------- chart popup (TradingView) ---------------- */
-  .chartpop{position:fixed;inset:0;z-index:60;display:none}
-  .chartpop.on{display:flex;align-items:center;justify-content:center}
-  .cp-scrim{position:absolute;inset:0;background:rgba(4,7,12,.74);backdrop-filter:blur(4px)}
-  .cp-box{position:relative;display:flex;flex-direction:column;width:min(1180px,95vw);height:min(88vh,940px);
-    background:var(--bg2);border:1px solid var(--line2);border-radius:16px;overflow:hidden;
-    box-shadow:0 30px 80px rgba(0,0,0,.62)}
-  .cp-head{display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--line);flex-wrap:wrap}
-  .cp-head b{font-size:14.5px;letter-spacing:.3px}
-  .cp-int{display:inline-flex;gap:2px;background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:2px}
-  .cp-int button{background:none;border:0;color:var(--dim);font:inherit;font-size:11.5px;font-weight:650;
-    padding:4px 9px;border-radius:7px;cursor:pointer}
-  .cp-int button:hover{color:var(--txt)}
-  .cp-int button.on{background:var(--panel2);color:#fff}
-  .cp-body{position:relative;flex:1;min-height:0;background:var(--bg)}
-  .cp-body iframe{display:block;width:100%;height:100%;border:0}
-  .tv-host{position:absolute;inset:0}
-  .cp-fallback{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;
-    gap:10px;padding:26px;text-align:center;color:var(--dim)}
-  .cp-fallback.on{display:flex}
-  .cp-note{display:flex;align-items:center;gap:10px;padding:5px 12px;border-top:1px solid var(--line);
-    font-size:11px;color:var(--dim2)}
-  @media (max-width:720px){
-    .cp-box{width:100vw;height:100dvh;border:0;border-radius:0}
-    .cp-head{gap:7px;padding:8px 10px}
-  }
+  .scrim{position:fixed;inset:0;background:rgba(4,7,12,.7);display:none;z-index:40;backdrop-filter:blur(3px)}
   .scrim.on{display:block}
   .drawer{position:fixed;top:0;right:0;height:100%;width:min(440px,94vw);background:var(--bg2);
     border-left:1px solid var(--line);z-index:41;transform:translateX(102%);transition:transform .24s ease;
@@ -511,6 +485,14 @@
     <label>F&amp;O ban-list symbols (comma separated)</label>
     <textarea id="s_ban" rows="2" placeholder="e.g. IDEA, INDUSINDBK"></textarea>
   </div>
+  <div class="frow">
+    <label>Chart link — a stock's name opens this, with <code>?symbol=NSE:&lt;SYMBOL&gt;</code> added</label>
+    <input type="text" id="s_tvurl" spellcheck="false" autocapitalize="off"
+           placeholder="https://www.tradingview.com/chart/XXXXXXXX/">
+    <div class="note">Open the layout you trade from on TradingView and copy the address bar — a
+      <b>saved layout</b> is what carries your indicators. Leave the symbol out of it; the app adds the
+      one you tapped. Resets to the default when the app restarts.</div>
+  </div>
   <button class="primary" id="btnSaveSettings" style="width:100%">Save settings</button>
   <div class="frow" style="margin-top:14px">
     <button id="btnRebuild" style="width:100%">⟲ Rebuild F&amp;O list from Upstox</button>
@@ -519,40 +501,6 @@
   <div class="frow" style="margin-top:14px">
     <label>Status</label>
     <div class="note" id="statBox"></div>
-  </div>
-</div>
-<div class="chartpop" id="chartPop" aria-hidden="true">
-  <div class="cp-scrim" data-close="1"></div>
-  <div class="cp-box" role="dialog" aria-modal="true" aria-label="TradingView chart">
-    <div class="cp-head">
-      <b id="cpSym">—</b>
-      <span class="dim mono" id="cpPx" style="font-size:12px"></span>
-      <span class="cp-int" id="cpInt">
-        <button type="button" data-iv="5" class="on">5m</button>
-        <button type="button" data-iv="15">15m</button>
-        <button type="button" data-iv="60">1H</button>
-        <button type="button" data-iv="D">1D</button>
-      </span>
-      <div class="spacer"></div>
-      <a class="ghostlink" id="cpOpen" target="_blank" rel="noopener"
-         title="Opens your own TradingView chart — your account's saved layout and indicators load there">Open in TradingView ↗</a>
-      <button class="ghost" id="cpClose" title="Close (Esc)">✕</button>
-    </div>
-    <div class="cp-body">
-      <div class="tv-host tradingview-widget-container" id="tvHost">
-        <div class="tradingview-widget-container__widget"></div>
-      </div>
-      <div class="cp-fallback" id="cpFallback">
-        <div>The TradingView chart did not load — your network may be blocking it.</div>
-        <a class="ghostlink" id="cpOpen2" target="_blank" rel="noopener">Open the chart on tradingview.com ↗</a>
-      </div>
-    </div>
-    <div class="cp-note">
-      <span id="cpNote">Embedded TradingView widget — a saved layout with your own indicators only loads on
-        tradingview.com, so use the link above for that.</span>
-      <div class="spacer"></div>
-      <span>Chart by TradingView</span>
-    </div>
   </div>
 </div>
 <div class="toast" id="toast"></div>
@@ -684,7 +632,8 @@ $('btnSaveSettings').onclick=async()=>{
     min_atr_pct:+$('s_atr').value, min_price:+$('s_price').value,
     picks_per_side:+$('s_picks').value, sector_cap:+$('s_sector').value,
     score_floor:+$('s_floor').value, show_longs:$('s_longs').checked, show_shorts:$('s_shorts').checked,
-    ban_list:$('s_ban').value.split(',').map(x=>x.trim()).filter(Boolean)
+    ban_list:$('s_ban').value.split(',').map(x=>x.trim()).filter(Boolean),
+    tv_url:$('s_tvurl').value.trim()
   };
   const r=await fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   const j=await r.json(); toast(j.ok?'✓ Settings saved':'✕ could not save');
@@ -728,6 +677,7 @@ function fillSettings(){
   $('s_picks').value=s.picks_per_side??5; $('s_sector').value=s.sector_cap??2;
   $('s_floor').value=s.score_floor??52; $('s_longs').checked=s.show_longs!==false;
   $('s_shorts').checked=s.show_shorts!==false; $('s_ban').value=(s.ban_list||[]).join(', ');
+  if($('s_tvurl')) $('s_tvurl').value=s.tv_url||'';
 }
 
 /* ---------------- visual helpers ---------------- */
@@ -805,8 +755,8 @@ function renderSide(rows, side){
     const rv = r.rvol ?? 0;
     const rvCls = rv>=3 ? 'rvmax' : (rv>=1.8 ? 'rvhot' : '');
     return `<tr class="${fresh?'fresh':''}">
-    <td><span class="symc"><button type="button" class="symbtn" data-sym="${esc(r.symbol)}"
-        title="Open the TradingView chart for ${esc(r.symbol)}"><b>${esc(r.symbol)}</b></button>${fresh?'<span class="badge new">NEW</span>':''}${r.deep?'<span class="deepp" title="1-min analysed">●</span>':''}</span></td>
+    <td><span class="symc"><a class="symlink" href="${esc(tvChartHref(r.symbol))}" target="_blank" rel="noopener"
+        title="Open ${esc(r.symbol)} on TradingView — your own layout, with your indicators"><b>${esc(r.symbol)}</b></a>${fresh?'<span class="badge new">NEW</span>':''}${r.deep?'<span class="deepp" title="1-min analysed">●</span>':''}</span></td>
     <td class="seen"><span class="st">${ist12(isoHM(first))}</span>
         <span class="sa ${fresh?'fresh':''}">${ageLabel(secs)}</span></td>
     <td class="mono ${fl}">${fmt(r.ltp)}</td>
@@ -1021,108 +971,21 @@ $('btnReplay').addEventListener('click', async (ev)=>{
   }
 });
 
-/* ---------------- TradingView chart popup ----------------
-   Tapping a stock's name opens the embedded TradingView chart for NSE:<symbol>.
-   The public widget cannot sign into anyone's account, so a private saved layout
-   (your indicators) can only load on tradingview.com itself — the header link
-   goes straight there with the same symbol. */
-const CP = {sym:'', iv:'5', timer:null};
-const CP_IVS = {'5':'5m','15':'15m','60':'1H','D':'1D'};
-const isSym = v => /^[A-Z0-9&._-]{1,20}$/i.test(v || '');
-function tvChartUrl(sym, iv){
-  /* the colon is left readable; the symbol itself is escaped */
-  return 'https://www.tradingview.com/chart/?symbol='
-       + encodeURIComponent('NSE:' + sym).replace(/%3A/g, ':')
-       + (iv && iv !== 'D' ? '&interval=' + encodeURIComponent(iv) : '');
+/* ---------------- the chart link ----------------
+   Tapping a stock's name opens YOUR TradingView layout with the symbol swapped
+   in. A layout is what carries your indicators, colours and drawings, and it
+   only loads on tradingview.com inside your own logged-in browser — an embedded
+   widget can never sign into an account, which is why there is no popup here.
+   Set the layout in the Settings drawer; leave ?symbol= out, the app adds it. */
+const TV_FALLBACK = 'https://www.tradingview.com/chart/';
+function tvChartHref(sym){
+  const raw = ((S.data && S.data.settings && S.data.settings.tv_url) || '').trim();
+  const ok = /^https?:\/\//i.test(raw) ? raw : TV_FALLBACK;
+  /* whatever sat in that box: drop any symbol it already carried, then add ours */
+  const base = ok.replace(/([?&])symbol=[^&#]*/gi, '$1').replace(/\?&/g, '?').replace(/[?&]+$/, '');
+  const sep = base.includes('?') ? '&' : '?';
+  return base + sep + 'symbol=' + encodeURIComponent('NSE:' + sym).replace(/%3A/g, ':');
 }
-function cpWidget(){
-  const host = $('tvHost');
-  if(!host) return;
-  const box = host.querySelector('.tradingview-widget-container__widget') || host;
-  host.querySelectorAll('script').forEach(el=>el.remove());
-  host.querySelectorAll('iframe').forEach(el=>el.remove());
-  box.innerHTML = '';
-  $('cpFallback').classList.remove('on');
-  const cfg = {autosize:true, symbol:'NSE:' + CP.sym, interval:CP.iv, timezone:'Asia/Kolkata',
-    theme:'dark', style:'1', locale:'en', backgroundColor:'#070a10',
-    gridColor:'rgba(148,170,210,.10)', hide_side_toolbar:false, allow_symbol_change:true,
-    save_image:false, withdateranges:true, details:false, calendar:false,
-    support_host:'https://www.tradingview.com'};
-  const sc = document.createElement('script');
-  sc.type = 'text/javascript'; sc.async = true;
-  sc.src = 'https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js';
-  sc.innerHTML = JSON.stringify(cfg);
-  host.appendChild(sc);
-  clearTimeout(CP.timer);
-  CP.timer = setTimeout(()=>{                       /* offline / blocked network */
-    if(!host.querySelector('iframe')) $('cpFallback').classList.add('on');
-  }, 7000);
-}
-function cpUnmount(){
-  clearTimeout(CP.timer);
-  const host = $('tvHost');
-  if(!host) return;
-  host.querySelectorAll('script').forEach(el=>el.remove());
-  host.querySelectorAll('iframe').forEach(el=>el.remove());
-  const box = host.querySelector('.tradingview-widget-container__widget');
-  if(box) box.innerHTML = '';
-}
-function cpMeta(){
-  const rows = (S.data && S.data.universe) || [];
-  const r = rows.find(x=>x.symbol === CP.sym);
-  const bits = [];
-  if(r){
-    if(r.ltp !== null && r.ltp !== undefined) bits.push(money(r.ltp));
-    if(r.pct_chg !== null && r.pct_chg !== undefined) bits.push(sgn(r.pct_chg) + '%');
-    if(r.rvol !== null && r.rvol !== undefined) bits.push('RVOL ' + fmt(r.rvol,1) + 'x');
-    if(r.oi_chg !== null && r.oi_chg !== undefined) bits.push('OI ' + fmt(r.oi_chg,1) + '%');
-  }
-  $('cpPx').textContent = bits.join(' · ');
-}
-function cpOpen(sym){
-  if(!isSym(sym)) return;
-  CP.sym = String(sym).toUpperCase();
-  $('cpSym').textContent = CP.sym;
-  $('cpOpen').href = tvChartUrl(CP.sym, CP.iv);
-  $('cpOpen2').href = $('cpOpen').href;
-  cpMeta();
-  $('chartPop').classList.add('on');
-  $('chartPop').setAttribute('aria-hidden','false');
-  document.body.classList.add('noscroll');
-  cpWidget();
-  $('cpClose').focus();
-}
-function cpClose(){
-  $('chartPop').classList.remove('on');
-  $('chartPop').setAttribute('aria-hidden','true');
-  document.body.classList.remove('noscroll');
-  cpUnmount();
-}
-['tblLong','tblShort'].forEach(id=>{
-  const tb = $(id).querySelector('tbody');
-  if(!tb) return;
-  tb.addEventListener('click', ev=>{
-    const b = ev.target.closest && ev.target.closest('.symbtn');
-    if(b && b.dataset.sym) cpOpen(b.dataset.sym);
-  });
-});
-$('cpInt').addEventListener('click', ev=>{
-  const b = ev.target.closest && ev.target.closest('button[data-iv]');
-  if(!b) return;
-  CP.iv = b.dataset.iv;
-  $('cpInt').querySelectorAll('button').forEach(x=>x.classList.toggle('on', x === b));
-  if(CP.sym){
-    /* the link out has to follow the chip, or the two views disagree */
-    $('cpOpen').href = tvChartUrl(CP.sym, CP.iv);
-    $('cpOpen2').href = $('cpOpen').href;
-    cpWidget();
-  }
-});
-$('cpClose').addEventListener('click', cpClose);
-$('chartPop').addEventListener('click', ev=>{ if(ev.target.dataset && ev.target.dataset.close) cpClose(); });
-document.addEventListener('keydown', ev=>{
-  if(ev.key === 'Escape' && $('chartPop').classList.contains('on')) cpClose();
-});
 
 /* ---------------- polling ---------------- */
 async function poll(delay=0){
@@ -1140,7 +1003,6 @@ async function poll(delay=0){
         setTimeout(()=>location.reload(), 1200);
       } else if(!S.reloading){
         render(j);
-        if($('chartPop').classList.contains('on')) cpMeta();   /* popup stays open, numbers stay live */
       }
     }
   }catch(e){ /* keep last view */ }

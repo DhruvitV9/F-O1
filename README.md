@@ -247,22 +247,26 @@ times are the minutes a filter was **satisfied**, not when the live page happene
 dated URL, which route is chosen for a finished session vs the current one, a full
 collect → replay → report run, and the refusals the build endpoint must make.
 
-## 10. Chart popup — tap a stock's name
+## 10. Charts — tapping a stock's name opens your own layout
 
-Tapping any symbol in either table opens a chart popup: an embedded TradingView chart on
-`NSE:<symbol>`, dark, 5-minute by default, with **15m / 1H / 1D** chips and a link out to
-`tradingview.com/chart/?symbol=NSE:<symbol>` for the same stock. Esc, the ✕ or a tap outside
-closes it and unloads the widget (nothing keeps polling TradingView in the background).
+Tapping a symbol in either table opens **your** TradingView chart in a new tab with the symbol
+swapped in: `<your layout URL>?symbol=NSE:<SYMBOL>`.
 
-TradingView only lets you have one half of "my own indicators", so be clear about which:
+Use a **saved layout** URL, not the bare `tradingview.com/chart/` one — a layout is what carries
+your indicators, colours and drawings. Open that layout on TradingView, copy the address bar, and
+paste it into **⚙ Settings → Chart link** (it ships pre-filled with the layout this was built for).
+Whatever the URL already had, the app drops its `symbol=` and adds the one you tapped.
 
-- the **embedded widget is anonymous** — it cannot sign into your account, so the layout you
-  saved on TradingView (your indicators, colours, drawings) does **not** load inside it. It
-  gives you the standard chart, with TradingView's own indicator menu in its toolbar.
-- the **link out is your account** — it opens tradingview.com in a new tab, logged in as you,
-  where your saved layout *does* load, with the symbol already switched.
+Two things this deliberately is *not*:
 
-So: quick look in the popup, your real setup one click away.
+- **not a popup inside this page.** An embedded TradingView chart is an anonymous widget — it has no
+  login, so your saved layout can never load in it. (This is the same reason broker platforms show a
+  reduced indicator set.) The first version of this feature was a popup, and a plain chart was
+  exactly what it showed.
+- **not an iframe to tradingview.com either.** Their chart pages refuse to be framed, and a
+  cross-site frame would not carry your login even if they did.
+
+So the chart opens in its own tab: logged in as you, symbol already switched, your setup intact.
 
 ## 11. Honest notes
 
@@ -271,5 +275,6 @@ So: quick look in the popup, your real setup one click away.
 - Scores are relative: on a dead, choppy day everything scores lower and you may get 1–2 names, not 10. That is intentional.
 - The engine uses cash-market candles for VWAP/levels (the standard reference) and futures quotes for OI and the tradeable price; the card shows both.
 - Educational/analysis tool, **not investment advice**. Paper-trade it for a few sessions before risking money.
-- The chart popup cannot carry your saved TradingView layout: a widget has no login. The
-  **Open in TradingView ↗** link inside the popup is the one that shows your own indicators.
+- The chart opens **your TradingView layout** in a new tab — the only way your own indicators come
+  along, since an embedded chart cannot sign into your account. Nothing in this app can show a
+  private layout inside the page.

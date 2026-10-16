@@ -563,6 +563,10 @@ def api_settings(body: dict) -> dict:
         try:
             if k == "ban_list":
                 v = [str(x).strip().upper() for x in (v or []) if str(x).strip()]
+            elif k == "tv_url":
+                v = str(v or "").strip()[:300]
+                if v and not re.match(r"^https?://", v):
+                    continue          # a chart link, or nothing at all
             elif k in ("show_longs", "show_shorts"):
                 v = bool(v)
             elif k in INT_RANGES:
