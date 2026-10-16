@@ -198,6 +198,25 @@ have entered under a different filter? — by walking a finished session through
 `engine.py`**, one minute at a time, with the engine clock pinned to the replayed minute
 (RVOL pace, turnover projection and session phase all follow it).
 
+### From the app — just click Replay
+
+The header has a **▤ Replay** button. If a report already exists it opens it; if not, it
+**builds one**: the server fetches that session's 1-minute candles from Upstox, walks them
+through the engine, and writes the report, reporting progress on the button itself
+(`▤ Replay · fetching 42%` → `replaying` → it opens the page by itself). The default target is
+the newest session that has finished, and shift-clicking forces a rebuild.
+
+The build runs on a background thread (`POST /api/replay/build`, progress in
+`/api/snapshot → app.replay.job`) because fetching a full session is ~2 API calls per stock at
+60/min — a few minutes. Keep the tab (or the live screen) open while it runs.
+
+Two things bite on a host like Render's free tier: the token you paste is valid for **that
+day**, so the build has to run on the day of the session you want; and the disk is ephemeral,
+so a redeploy or a long idle spin-down takes the report **and** its candle cache with it. A
+rebuild from the cache is ~20 seconds, but the first build of a session is the slow one.
+
+### By hand
+
 ```bash
 python3 replay.py                       # last session, no filter (fetches + caches candles)
 python3 replay.py --session 2026-10-16 --step 1 --rvol 1.5 --cap 40
@@ -216,9 +235,17 @@ In the report, the RVOL / `Short ≤` / `Long ≤` boxes recompute every first-s
 browser using exactly the predicate in `static/index.html`, and the grid underneath shows the
 whole filter space at once (stocks that would have entered, and the median time they did).
 
+Past sessions come from Upstox's *dated* historical route — `/v3/historical-candle/{key}/
+minutes/1/{to_date}/{from_date}` (`UpstoxClient.historical_candles`). The plain intraday route
+the live screen uses only ever serves the session in progress, so it cannot replay yesterday.
+
 The round trip is verified: the replay re-derives the names the live screen logged as picks
 that day, and `replay.py` prints that cross-check at the end of every run. Note that first-seen
 times are the minutes a filter was **satisfied**, not when the live page happened to refresh.
+
+`python3 tests/offline_replay.py` checks the whole pipeline with no network and no token: the
+dated URL, which route is chosen for a finished session vs the current one, a full
+collect → replay → report run, and the refusals the build endpoint must make.
 
 ## 10. Honest notes
 

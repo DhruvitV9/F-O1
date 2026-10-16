@@ -193,13 +193,30 @@ class UpstoxClient:
                          f"/{unit}/{interval}", kind="history")
         return _candles(data)
 
+    def historical_candles(self, key: str, unit: str = "minutes", interval: int = 1,
+                           to_date: str = "", from_date: str = "") -> list:
+        """Candles for a date range that has already happened (ascending).
+
+        This is the *dated* route, and it is what makes a past session replayable:
+        `intraday_candles()` above only ever serves the session in progress, so it
+        returns nothing for yesterday.
+
+            /v3/historical-candle/{key}/{unit}/{interval}/{to_date}/{from_date}
+
+        Dates are inclusive YYYY-MM-DD; pass the same date twice for one session.
+        Upstox caps `minutes/1` at about a month back, which is plenty for a replay.
+        """
+        to_d = (to_date or datetime.now(IST).date().isoformat()).strip()
+        frm = (from_date or to_d).strip()
+        data = self._get(f"/v3/historical-candle/{urllib.parse.quote(key, safe='|')}"
+                         f"/{unit}/{int(interval)}/{to_d}/{frm}", kind="history")
+        return _candles(data)
+
     def daily_candles(self, key: str, days: int = 90) -> list:
         """Daily candles for the recent past (ascending)."""
         to_d = datetime.now(IST).date()
         from_d = to_d - timedelta(days=int(days * 1.6) + 5)
-        data = self._get(f"/v3/historical-candle/{urllib.parse.quote(key, safe='|')}"
-                         f"/days/1/{to_d.isoformat()}/{from_d.isoformat()}", kind="history")
-        return _candles(data)
+        return self.historical_candles(key, "days", 1, to_d.isoformat(), from_d.isoformat())
 
 
 def _candles(data: dict) -> list:

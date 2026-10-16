@@ -63,6 +63,23 @@ def session_date(now: datetime | None = None) -> str:
     return d.isoformat()
 
 
+def last_session(now: datetime | None = None) -> str:
+    """The most recent session that has already finished.
+
+    `session_date()` answers "which session do these levels belong to" (it rolls
+    forward after the close). A replay wants the opposite: the session whose
+    candles are complete, so before 15:30 IST that is the previous trading day.
+    """
+    now = (now or datetime.now(IST)).astimezone(IST)
+    d = now.date()
+    mins = now.hour * 60 + now.minute
+    if mins < SESSION_CLOSE[0] * 60 + SESSION_CLOSE[1]:
+        d -= timedelta(days=1)
+    while d.weekday() >= 5:
+        d -= timedelta(days=1)
+    return d.isoformat()
+
+
 def minutes_elapsed(now: datetime | None = None) -> int:
     now = (now or datetime.now(IST)).astimezone(IST)
     m = (now.hour * 60 + now.minute) - (SESSION_OPEN[0] * 60 + SESSION_OPEN[1])
@@ -90,6 +107,10 @@ class LiveSource:
 
     def daily(self, key, days=60):
         return self.client.daily_candles(key, days)
+
+    def historical(self, key, unit="minutes", interval=1, to_date="", from_date=""):
+        """Dated candles for a finished session (see UpstoxClient.historical_candles)."""
+        return self.client.historical_candles(key, unit, interval, to_date, from_date)
 
 
 
@@ -270,6 +291,20 @@ class DemoSource:
 
     def intraday(self, key, unit="minutes", interval=1):
         return self._series(key)[1]
+
+    def historical(self, key, unit="minutes", interval=1, to_date="", from_date=""):
+        """Dated candles, mirroring the live API's shape.
+
+        The demo generator only ever produces the session in progress, so a range
+        that does not include today honestly comes back empty — same as asking
+        Upstox for minutes older than it keeps.
+        """
+        daily, mins = self._series(key)
+        rows = daily if unit == "days" else mins
+        out = [r for r in rows
+               if (not from_date or str(r[0])[:10] >= from_date)
+               and (not to_date or str(r[0])[:10] <= to_date)]
+        return out
 
     def _find_eq_key(self, eq_key):
         return eq_key

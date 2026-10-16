@@ -12,6 +12,8 @@ Endpoints
   POST /api/refresh     force an immediate refresh
   POST /api/demo        back to synthetic data
   POST /api/universe    rebuild the F&O list from Upstox's instrument master
+  GET  /replay          the newest session-replay report (static HTML)
+  POST /api/replay/build  fetch a finished session's candles and build that report
 """
 from __future__ import annotations
 
@@ -29,7 +31,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import auth
 from engine import DEFAULTS, Engine
-from sources import DemoSource, LiveSource, market_status, session_date
+from sources import DemoSource, LiveSource, last_session, market_status, session_date
 from universe import build_universe
 from upstox_client import IST, UpstoxError
 
@@ -61,7 +63,15 @@ def _ensure_dir(preferred: str, fallback: str) -> str:
 CACHE = _ensure_dir(CACHE, os.path.join(BASE, "cache"))
 LOGS = _ensure_dir(LOGS, os.path.join(BASE, "logs"))
 RUNTIME = _ensure_dir(RUNTIME, os.path.join(BASE, "runtime"))
+# Reports and candle caches written by the replay job. LOGS can be redirected
+# (e.g. to a mounted disk), so everything replay-related is derived from it
+# rather than from the app directory.
+REPLAY_DIR = os.path.join(LOGS, "replay")
 TOKEN_FILE = os.path.join(RUNTIME, "token.txt")
+# The build runs while the live screener keeps polling, and they hold separate
+# rate-limit buckets, so the build's history calls are deliberately slower than
+# the screener's own (95/min) to stay well inside Upstox's per-minute limit.
+REPLAY_HISTORY_PER_MIN = float(os.environ.get("REPLAY_HISTORY_PER_MIN") or 60)
 CREDS_FILE = os.path.join(RUNTIME, "credentials.json")
 STATIC = os.path.join(BASE, "static")
 
@@ -259,26 +269,192 @@ def auth_status(host_header: str = "") -> dict:
 
 
 # ------------------------------------------------------------------------ API
-REPLAY_MISSING_PAGE = b"""<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"/>
+REPLAY_MISSING_PAGE = """<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>Session replay \u00b7 F&amp;O screener</title>
 <style>body{margin:0;background:#070a10;color:#e9eefb;
  font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
- .w{max-width:720px;margin:0 auto;padding:56px 20px}a{color:#4c8dff;text-decoration:none}
+ .w{max-width:720px;margin:0 auto;padding:52px 20px}a{color:#4c8dff;text-decoration:none}
  code{background:#131b28;border:1px solid rgba(148,170,210,.18);border-radius:6px;padding:2px 7px;
  font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px}
  h1{font-size:19px;margin:0 0 6px}p{color:#8a97b4}
  pre{background:#0e141f;border:1px solid rgba(148,170,210,.10);border-radius:12px;padding:14px 16px;
- overflow:auto;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;color:#c3cede}</style>
+ overflow:auto;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;color:#c3cede}
+ button{font:inherit;font-weight:600;cursor:pointer;border:none;border-radius:10px;padding:11px 18px;
+ background:linear-gradient(135deg,#3b7cf6,#6d8fff);color:#fff;box-shadow:0 3px 12px rgba(76,141,255,.3)}
+ button:disabled{opacity:.55;cursor:progress}
+ #st{margin-top:12px;font-size:13.5px;color:#8a97b4;min-height:20px}
+ .bar{height:6px;border-radius:4px;background:#131b28;overflow:hidden;margin:10px 0 0;display:none}
+ .bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#3b7cf6,#2ee6a8)}
+ .err{color:#ff8b9c}</style>
 </head><body><div class="w">
 <h1>No session replay built yet</h1>
-<p>The replay walks a finished session through the real scoring engine and writes one
-filterable page per session. Build it once with a working Upstox token:</p>
-<pre>python3 replay.py --session 2026-10-16
+<p>The replay walks a finished session through the real scoring engine, one minute at a
+time, and writes a filterable page per session. Build one now — it fetches that
+session's 1-minute candles from Upstox, so it takes a few minutes the first time and
+seconds after that.</p>
+<p><button id="go">Build the replay</button></p>
+<div class="bar" id="bar"><i id="barfill"></i></div>
+<div id="st"></div>
+<p style="margin-top:22px" class="dim">Keep this tab (or the live screen) open while it builds.
+You can also run it by hand with a token:</p>
+<pre>python3 replay.py --session YYYY-MM-DD
 python3 replay_report.py</pre>
-<p>Then reload this page. The report is static: nothing here touches the live screen or the API.</p>
-<p><a href="/">\u2190 back to the live screen</a></p>
-</div></body></html>"""
+<p><a href="/">&larr; back to the live screen</a></p>
+</div>
+<script>
+const $ = id => document.getElementById(id);
+const T = {starting: [0, 0], fetching: [15, 85], replaying: [88, 11], ready: [100, 0], error: [0, 0]};
+let timer = null;
+function show(job){
+  if(!job || !job.state || job.state === 'idle'){
+    $('go').disabled = false;
+    $('bar').style.display = 'none';
+    $('st').className = '';
+    $('st').textContent = '';
+    if(timer){ clearInterval(timer); timer = null; }
+    return;
+  }
+  const [base, span] = T[job.state] || [0, 0];
+  const frac = job.total ? Math.min(1, (job.done || 0) / job.total) : 0;
+  if(job.state === 'error'){
+    $('st').className = 'err';
+    $('st').textContent = job.error || 'The build failed.';
+    $('go').disabled = false;
+    $('bar').style.display = 'none';
+    if(timer){ clearInterval(timer); timer = null; }
+    return;
+  }
+  if(job.state === 'ready'){
+    $('st').textContent = 'Done — opening ' + (job.report || 'the report') + '…';
+    location.reload();
+    return;
+  }
+  $('go').disabled = true;
+  $('bar').style.display = 'block';
+  $('barfill').style.width = Math.round(base + span * frac) + '%';
+  const mine = job.total ? ' (' + job.done + '/' + job.total + ')' : '';
+  $('st').textContent = (job.state === 'replaying'
+    ? 'Replaying the session minute by minute' + (job.note ? ' — at ' + job.note : '')
+    : 'Fetching historical candles' + mine) + '…';
+}
+async function poll(){
+  try{
+    const r = await fetch('/api/snapshot', {cache: 'no-store'});
+    const j = await r.json();
+    show((j.app && j.app.replay && j.app.replay.job) || null);
+  }catch(e){ /* keep the last message */ }
+}
+$('go').onclick = async () => {
+  $('go').disabled = true;
+  $('st').className = '';
+  $('st').textContent = 'Starting…';
+  try{
+    const r = await fetch('/api/replay/build', {method: 'POST',
+      headers: {'Content-Type': 'application/json'}, body: '{}'});
+    const j = await r.json();
+    if(!j.ok){
+      $('st').className = 'err';
+      $('st').textContent = j.error || 'Could not start the build.';
+      $('go').disabled = false;
+      return;
+    }
+    if(!timer) timer = setInterval(poll, 4000);
+    poll();
+  }catch(e){
+    $('st').className = 'err';
+    $('st').textContent = 'Could not reach the server.';
+    $('go').disabled = false;
+  }
+};
+poll();
+</script>
+</body></html>"""
+
+
+# ------------------------------------------------------------ replay build job
+# A build fetches a whole session's candles (~2 calls per stock, rate limited to
+# well under a hundred a minute), so it runs on its own thread and reports
+# progress through /api/snapshot. The UI and the "no report yet" page both read
+# it from there.
+REPLAY_JOB = {
+    "state": "idle",        # idle | starting | fetching | replaying | ready | error
+    "phase": "", "done": 0, "total": 0, "note": "",
+    "session": "", "started": "", "ended": "", "error": "", "report": "",
+    "source": "",
+}
+JOB_LOCK = threading.Lock()
+
+
+def replay_job_info() -> dict:
+    with JOB_LOCK:
+        return dict(REPLAY_JOB)
+
+
+def _job_set(**kw):
+    with JOB_LOCK:
+        REPLAY_JOB.update(kw)
+
+
+def _now_ist() -> str:
+    return datetime.now(IST).isoformat(timespec="seconds")
+
+
+def _replay_worker(session: str, mode: str, token: str, step: int):
+    """Fetch that session's candles, replay them, write the report. Never raises."""
+    try:
+        import replay as R
+        import replay_report as RR
+
+        uni = load_universe()
+        if mode == "live":
+            src = LiveSource(token, history_per_min=REPLAY_HISTORY_PER_MIN)
+            src_label = "upstox"
+        else:
+            src = DemoSource(uni)
+            src_label = "demo"
+        _job_set(source=src_label)
+
+        def progress(phase, done, total, note):
+            _job_set(state=phase, phase=phase, done=int(done), total=int(total), note=note)
+
+        res = R.build_session(session, src, uni, step=step, progress=progress)
+        out, frames = RR.build(res["frames_json"])
+        _job_set(state="ready", phase="ready", report=os.path.basename(out),
+                 session=res["session"], done=res["stamps"], total=res["stamps"],
+                 note=f"{res['count']} stock-sides qualified", ended=_now_ist())
+        print(f"[replay] {res['session']} ready: {res['count']} stock-sides, "
+              f"{res['stamps']} minutes -> {out}")
+    except Exception as e:                                   # noqa: BLE001
+        msg = e.friendly() if isinstance(e, UpstoxError) else f"{type(e).__name__}: {e}"
+        _job_set(state="error", phase="error", error=msg, ended=_now_ist())
+        print(f"[replay] build failed: {msg}")
+
+
+def start_replay_build(body: dict) -> tuple[dict, int]:
+    """POST /api/replay/build — kick the job off and return immediately."""
+    session = str(body.get("session") or "").strip()
+    if session and not re.fullmatch(r"\d{4}-\d{2}-\d{2}", session):
+        return {"ok": False, "error": "session must look like 2026-10-16"}, 400
+    mode = STATE.get("mode") or "demo"
+    token = str(body.get("token") or "").strip() or read_saved_token()
+    if mode == "live" and not token:
+        return {"ok": False, "error": "No Upstox token yet — paste one in Settings, "
+                                      "then build the replay."}, 400
+    with JOB_LOCK:
+        if REPLAY_JOB["state"] in ("starting", "fetching", "replaying"):
+            return {"ok": False, "error": "A replay build is already running.",
+                    "job": dict(REPLAY_JOB)}, 409
+    sess = session or last_session()
+    try:
+        step = max(1, min(15, int(body.get("step") or 1)))
+    except (TypeError, ValueError):
+        step = 1
+    _job_set(state="starting", phase="starting", done=0, total=0, session=sess,
+             started=_now_ist(), ended="", error="", report="", note="")
+    threading.Thread(target=_replay_worker, args=(sess, mode, token, step),
+                     name="replay-build", daemon=True).start()
+    return {"ok": True, "session": sess, "job": replay_job_info()}, 200
 
 
 def replay_info() -> dict:
@@ -288,7 +464,7 @@ def replay_info() -> dict:
     exists and never builds anything.
     """
     try:
-        reports = glob.glob(os.path.join(BASE, "logs", "replay", "report_*.html"))
+        reports = glob.glob(os.path.join(REPLAY_DIR, "report_*.html"))
     except OSError:
         return {}
     if not reports:
@@ -312,6 +488,24 @@ def ui_version() -> str:
         return ""
 
 
+def app_info() -> dict:
+    """Everything the UI needs to know about the server itself (no engine needed)."""
+    return {
+        "password_gate": auth_enabled(),
+        "persistent_dirs": {"cache": CACHE, "logs": LOGS, "runtime": RUNTIME},
+        # Lets an open tab notice that the UI on disk has changed.
+        "ui_version": ui_version(),
+        # Set only when UPSTOX_API_ROOT points away from Upstox itself. The UI
+        # warns loudly in that case, so a stand-in feed can never be mistaken
+        # for real market data.
+        "custom_api_root": CUSTOM_API_ROOT,
+        # Session the /replay report covers, any build in flight, and the session
+        # the Replay button would build next.
+        "replay": {**replay_info(), "job": replay_job_info(),
+                   "last_session": last_session()},
+    }
+
+
 def api_snapshot(host_header: str = "") -> dict:
     with STATE["lock"]:
         eng, mode = STATE["engine"], STATE["mode"]
@@ -327,16 +521,7 @@ def api_snapshot(host_header: str = "") -> dict:
     data["settings"] = eng.settings
     data["mode"] = mode
     data["auth"] = auth_status(host_header)
-    data["app"] = {"password_gate": auth_enabled(),
-                   "persistent_dirs": {"cache": CACHE, "logs": LOGS, "runtime": RUNTIME},
-                   # Lets an open tab notice that the UI on disk has changed.
-                   "ui_version": ui_version(),
-                   # Set only when UPSTOX_API_ROOT points away from Upstox itself.
-                   # The UI warns loudly in that case, so a stand-in feed can never
-                   # be mistaken for real market data.
-                   "custom_api_root": CUSTOM_API_ROOT,
-                   # Session the /replay report covers, if one has been built.
-                   "replay": replay_info()}
+    data["app"] = app_info()
     return data
 
 
@@ -415,6 +600,7 @@ ROUTES_POST = {
     "/api/demo": api_demo,
     "/api/refresh": api_refresh,
     "/api/universe": api_rebuild,
+    "/api/replay/build": start_replay_build,
 }
 
 
@@ -509,7 +695,12 @@ class Handler(BaseHTTPRequestHandler):
             print(f"[http] {fmt % args}")
 
     def _send(self, obj, status=200, ctype="application/json"):
-        body = obj if isinstance(obj, bytes) else json.dumps(obj).encode()
+        if isinstance(obj, bytes):
+            body = obj
+        elif isinstance(obj, str):          # e.g. the HTML pages above
+            body = obj.encode("utf-8")
+        else:
+            body = json.dumps(obj).encode()
         self.send_response(status)
         self.send_header("Content-Type", ctype + ("; charset=utf-8" if "json" in ctype or "html" in ctype else ""))
         self.send_header("Content-Length", str(len(body)))
@@ -526,7 +717,7 @@ class Handler(BaseHTTPRequestHandler):
         It is a single self-contained HTML file (no assets, no API calls), so it
         is served straight off disk and can never interfere with the live screen.
         """
-        reports = glob.glob(os.path.join(BASE, "logs", "replay", "report_*.html"))
+        reports = glob.glob(os.path.join(REPLAY_DIR, "report_*.html"))
         if not reports:
             return self._send(REPLAY_MISSING_PAGE, 200, "text/html")
         newest = max(reports, key=os.path.getmtime)

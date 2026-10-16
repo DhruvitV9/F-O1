@@ -557,6 +557,23 @@ def render(d: dict, title: str | None = None) -> str:
     return out
 
 
+def build(frames_path: str, out_path: str | None = None, title: str | None = None) -> tuple[str, dict]:
+    """Render one frames dump into a self-contained report. Returns (path, frames).
+
+    Used by the CLI below and by the server's build job, so a report built from
+    the Replay button is exactly the same page as one built by hand.
+    """
+    d = load_frames(frames_path)
+    out = out_path or os.path.join(REPLAY_DIR, f"report_{d.get('session') or 'session'}.html")
+    html = render(d, title)
+    os.makedirs(os.path.dirname(out), exist_ok=True)
+    tmp = out + ".part"
+    with open(tmp, "w", encoding="utf-8") as f:
+        f.write(html)
+    os.replace(tmp, out)          # atomic: /replay can never serve a half-written page
+    return out, d
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.strip().splitlines()[0])
     ap.add_argument("--frames", default=None, help="frames_<session>.json written by replay.py")
@@ -576,14 +593,9 @@ def main(argv=None) -> int:
         print(f"{path} not found")
         return 1
 
-    d = load_frames(path)
-    out = args.out or os.path.join(REPLAY_DIR, f"report_{d.get('session') or 'session'}.html")
-    html = render(d, args.title)
-    os.makedirs(os.path.dirname(out), exist_ok=True)
-    with open(out, "w", encoding="utf-8") as f:
-        f.write(html)
-    print(f"report: {out}  ({len(html) // 1024} KB, {len(d.get('symbols') or [])} symbols, "
-          f"{d.get('stamps')} minutes)")
+    out, d = build(path, args.out, args.title)
+    print(f"report: {out}  ({os.path.getsize(out) // 1024} KB, "
+          f"{len(d.get('symbols') or [])} symbols, {d.get('stamps')} minutes)")
     return 0
 
 
