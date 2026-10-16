@@ -493,6 +493,8 @@
 
 <script>
 const S = {data:null, timer:null, countdown:0, prevLtp:{},
+  /* replay build: poll faster while one runs, and open the report when it lands */
+  replayTimer:null, replayWanted:false, replayState:'' ,
   /* each table sorts independently */
   sort:{long:{k:'score_long',dir:-1}, short:{k:'score_short',dir:-1}}};
 /* A stock only appears once its stronger side scores at least this much, so the
@@ -787,12 +789,40 @@ function render(d){
   const secs = Math.max(0,(d.settings?.refresh_sec||20) - ((Date.now()-new Date(d.server_time_ist).getTime())/1000));
   $('nextUpd').textContent = open ? 'next update ~'+Math.round(secs)+'s' : '';
   /* the Replay button opens the newest session-replay report (a static page at
-     /replay); label it with that session so it is obvious what you will see */
+     /replay). If none exists it builds one: the server fetches that session's
+     candles in the background and reports progress here, so the button doubles
+     as the progress display. */
   const rp = (d.app && d.app.replay) || null;
-  $('replayDay').textContent = rp && rp.session ? ' · '+shortDay(rp.session) : '';
-  $('btnReplay').title = rp && rp.session
-    ? `Replay ${rp.session}: change the RVOL / cap filters and see when each stock would have first entered the tables`
-    : 'Replay a finished session: change the RVOL / cap filters and see when each stock first entered the tables (run replay.py to build one)';
+  const job = (rp && rp.job) || null;
+  const busy = !!(job && (job.state==='starting'||job.state==='fetching'||job.state==='replaying'));
+  const pct = (job && job.total) ? Math.min(100, Math.round(100*(job.done||0)/job.total)) : null;
+  $('replayDay').textContent = busy
+    ? ' · ' + (job.state==='replaying' ? 'replaying' : 'fetching') +
+      (pct!==null ? ' '+pct+'%' : '…')
+    : (rp && rp.session ? ' · '+shortDay(rp.session) : ' · build');
+  $('btnReplay').title = busy
+    ? (job.state==='replaying'
+        ? `Replaying ${job.session} minute by minute${job.note? ' — at '+job.note:''}`
+        : `Fetching ${job.session} candles from Upstox (${job.done||0}/${job.total||'?'}) — keep this open`)
+    : (rp && rp.session
+        ? `Replay ${rp.session}: change the RVOL / cap filters and see when each stock would have first entered the tables (shift-click to rebuild it)`
+        : `Build a replay of ${(rp&&rp.last_session)||'the last session'}: fetches that session's 1-minute candles, then shows when each stock would have first entered the tables`);
+  if(busy){
+    /* a build takes minutes — poll faster than the screener's own cadence */
+    clearTimeout(S.replayTimer);
+    S.replayTimer = setTimeout(()=>poll(0), 3000);
+  }else{
+    clearTimeout(S.replayTimer); S.replayTimer=null;
+    if(S.replayWanted && rp && rp.session){
+      S.replayWanted=false;
+      toast('Replay ready — opening '+shortDay(rp.session)+'…', 2500);
+      setTimeout(()=>{ location.href='/replay'; }, 900);
+    }
+    if(job && job.state==='error' && S.replayState!=='error'){
+      toast(job.error||'The replay build failed.', 6000);
+    }
+  }
+  S.replayState = (job && job.state) || '';
 
   /* banners */
   let b='';
@@ -886,6 +916,39 @@ function render(d){
    on disk has changed and refresh itself instead of silently re-rendering an
    out-of-date table forever. */
 const UI_VERSION = (document.querySelector('meta[name="ui-version"]')||{}).content || '';
+
+/* Clicking Replay: follow the link when a report exists, otherwise ask the
+   server to build one from that session's historical candles. */
+$('btnReplay').addEventListener('click', async (ev)=>{
+  const rp = (S.data && S.data.app && S.data.app.replay) || null;
+  const job = (rp && rp.job) || null;
+  const busy = !!(job && (job.state==='starting'||job.state==='fetching'||job.state==='replaying'));
+  const force = ev.shiftKey;
+  if(busy){
+    ev.preventDefault();
+    toast('The replay is still building ('+(job.done||0)+'/'+(job.total||'?')+') — it will open by itself.', 5000);
+    return;
+  }
+  if(rp && rp.session && !force) return;          // a report exists: follow the link
+  ev.preventDefault();
+  S.replayWanted = true;
+  toast('Building the replay of '+((rp&&rp.last_session)||'the last session')+
+        ' from historical candles — a few minutes. Keep this tab open.', 8000);
+  try{
+    const r = await fetch('/api/replay/build', {method:'POST',
+      headers:{'Content-Type':'application/json'}, body:'{}'});
+    const j = await r.json();
+    if(!j.ok){
+      S.replayWanted = false;
+      toast(j.error || 'Could not start the replay build.', 6000);
+      return;
+    }
+    poll(0);
+  }catch(e){
+    S.replayWanted = false;
+    toast('Could not reach the server to build the replay.', 5000);
+  }
+});
 
 /* ---------------- polling ---------------- */
 async function poll(delay=0){

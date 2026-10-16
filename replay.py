@@ -68,15 +68,84 @@ def passes(rec: dict, want: str, rvol_min, cap) -> bool:
 
 
 # ------------------------------------------------------------------ collect ---
-def collect(src, universe: dict, session: str, force: bool = False, progress=None) -> dict:
+def minutes_for(src, key: str, session: str) -> list:
+    """1-minute candles for ONE finished session.
+
+    The intraday endpoint only ever serves the session in progress, so a session
+    that is not today has to come from the dated historical route. We try that
+    first for a past date and fall back to intraday, which also covers sources
+    (and test fixtures) that only implement the intraday call.
+    """
+    hist = getattr(src, "historical", None)
+    if session != datetime.now(IST).date().isoformat() and callable(hist):
+        try:
+            rows = hist(key, "minutes", 1, session, session) or []
+            rows = [c for c in rows if str(c[0])[:10] == session]
+            if len(rows) >= 3:
+                return rows
+        except UpstoxError:
+            raise
+        except Exception:
+            pass
+    rows = src.intraday(key, "minutes", 1) or []
+    return [c for c in rows if str(c[0])[:10] == session]
+
+
+def build_session(session: str, src, universe: dict, step: int = 1,
+                  filters: dict | None = None, progress=None, force: bool = False,
+                  cache_dir: str | None = None, log_dir: str | None = None) -> dict:
+    """Everything a replay needs, in one call: collect -> replay -> dump -> report.
+
+    This is what the server's build job runs, using the same functions the CLI
+    uses (collect -> run_replay -> export_frames), so a report built from the
+    Replay button is the same page a hand-run build produces.
+
+    `progress(phase, done, total, note)` is called with phase='fetching' while the
+    candles come in and phase='replaying' while the session runs.
+    """
+    def emit(phase):
+        def cb(*a):
+            if not progress or not a:
+                return
+            if len(a) == 2:
+                done, total, note = a[0], a[1], ""
+            else:
+                done, total, note = a[0], a[1], (a[2].strftime("%H:%M") if a[2] else "")
+            progress(phase, done, total, note)
+        return cb
+
+    log_dir = log_dir or os.path.join(LOGS, "replay")
+    candle_cache = os.path.join(cache_dir, "replay") if cache_dir else None
+    data = collect(src, universe, session, force=force, progress=emit("fetching"),
+                   cache_dir=candle_cache)
+    minutes = session_minutes(data)
+    if not minutes:
+        raise RuntimeError(
+            f"Upstox returned no 1-minute candles for {session}. A replay needs the "
+            f"dated historical route to have that session's minutes (minutes/1 reaches "
+            f"back about a month).")
+    res = run_replay(data, universe, filters or {}, step=step, cache_dir=cache_dir,
+                     log_dir=log_dir, progress=emit("replaying"))
+    frames_path = os.path.join(log_dir, f"frames_{session}.json")
+    export_frames(res, frames_path, source=source_label(data),
+                  recorded=recorded_picks(session))
+    return res
+
+
+def collect(src, universe: dict, session: str, force: bool = False, progress=None,
+            cache_dir: str | None = None) -> dict:
     """Fetch daily + 1-minute candles for every key and cache them for one session.
 
     Daily candles are stored WITHOUT the replayed session itself, so the engine's
     'previous session' reference (PDH/PDL/ATR) is the session before the one being
     replayed, whatever wall-clock time the replay runs at.
+
+    `cache_dir` overrides where the candle cache lives (tests use a temp dir so a
+    fixture can never be mistaken for a real session's candles later on).
     """
-    os.makedirs(REPLAY_CACHE, exist_ok=True)
-    path = os.path.join(REPLAY_CACHE, f"candles_{session}.json.gz")
+    cache_dir = cache_dir or REPLAY_CACHE
+    os.makedirs(cache_dir, exist_ok=True)
+    path = os.path.join(cache_dir, f"candles_{session}.json.gz")
     if os.path.exists(path) and not force:
         try:
             with gzip.open(path, "rt", encoding="utf-8") as f:
@@ -88,27 +157,33 @@ def collect(src, universe: dict, session: str, force: bool = False, progress=Non
 
     daily: dict[str, list] = {}
     minutes: dict[str, list] = {}
-    keys = [s["equity_key"] for s in universe["stocks"]] + \
-           [s["fut_key"] for s in universe["stocks"] if s.get("fut_key")] + \
-           list((universe.get("index_keys") or {}).values())
-    keys = list(dict.fromkeys(keys))
+    stocks = universe["stocks"]
+    eq_keys = [s["equity_key"] for s in stocks]
+    # Minute candles are needed for the cash quote, the futures quote (OI) and the
+    # index breadth strip, so every key gets them. Daily candles are only ever
+    # read for the cash instrument (engine.py: `src.daily(st["equity_key"], 60)`),
+    # so asking for a futures or index daily series would be ~200 wasted calls on
+    # a 210-stock universe — a quarter of the build's API budget.
+    keys = list(dict.fromkeys(eq_keys
+                              + [s["fut_key"] for s in stocks if s.get("fut_key")]
+                              + list((universe.get("index_keys") or {}).values())))
+    want_daily = set(eq_keys)
     total = len(keys)
     errs = 0
     for i, key in enumerate(keys):
+        if key in want_daily:
+            try:
+                rows = src.daily(key, 60) or []
+                # drop the replayed session's own daily row (it is a partial candle)
+                rows = [r for r in rows if str(r[0])[:10] < session]
+                if len(rows) >= 5:
+                    daily[key] = rows
+            except UpstoxError:
+                errs += 1
+            except Exception:
+                errs += 1
         try:
-            rows = src.daily(key, 60) or []
-            # drop the replayed session's own daily row (it is a partial candle)
-            rows = [r for r in rows if str(r[0])[:10] < session]
-            if len(rows) >= 5:
-                daily[key] = rows
-        except UpstoxError:
-            errs += 1
-        except Exception:
-            errs += 1
-        try:
-            mins = src.intraday(key, "minutes", 1) or []
-            # keep only the session being replayed
-            mins = [c for c in mins if str(c[0])[:10] == session]
+            mins = minutes_for(src, key, session)
             if len(mins) >= 3:
                 minutes[key] = mins
         except UpstoxError:
@@ -138,13 +213,20 @@ class ReplaySource:
         self.clock = clock
         self.spread_bps = spread_bps
         self.stats = {"calls": 0, "errors": 0, "last_error": "", "last_error_at": None}
+        # Requests for keys this dump does not hold. A build reports them so it can
+        # prove it fetched everything the engine reads (and nothing else).
+        self.misses = {"daily": 0, "minutes": 0}
 
     # ---- candle views ----
     def _mins(self, key: str) -> list:
+        if key not in self.min_map:
+            self.misses["minutes"] += 1
         t = self.clock.isoformat()
         return [r for r in self.min_map.get(key, []) if str(r[0]) <= t]
 
     def daily(self, key, days=60):
+        if key not in self.daily_map:
+            self.misses["daily"] += 1
         return self.daily_map.get(key, [])
 
     def intraday(self, key, unit="minutes", interval=1):
@@ -277,7 +359,6 @@ def run_replay(data: dict, universe: dict, filters: dict, step: int = 1,
     symbols: list[str] = []
     sym_ix: dict[str, int] = {}
     frames: list[list[list[float]]] = []
-    history: list[tuple[str, float, float]] = []             # (iso, long, short) per stamp
     try:
         for i, t in enumerate(stamps):
             E.REPLAY_NOW = t
@@ -322,11 +403,6 @@ def run_replay(data: dict, universe: dict, filters: dict, step: int = 1,
                     else:
                         e["last_seen"] = iso
                         e["ticks"] += 1
-            # keep a compact score history for the busiest names later
-            for r in snap["universe"]:
-                if (r["symbol"], "long") in rec or (r["symbol"], "short") in rec:
-                    if len(history) < 400000:
-                        history.append((iso, r["symbol"], r.get("rvol") or 0))
             if progress and (i % 5 == 0 or i == len(stamps) - 1):
                 progress(i + 1, len(stamps), t)
     finally:
@@ -347,6 +423,8 @@ def run_replay(data: dict, universe: dict, filters: dict, step: int = 1,
         "count": len(rows), "long": sum(1 for r in rows if r["side"] == "long"),
         "short": sum(1 for r in rows if r["side"] == "short"),
         "rows": rows,
+        # keys the engine asked for that the dump does not hold — should be empty
+        "cache_misses": dict(src.misses),
         "symbols": symbols, "frames": frames,
         "stamps_iso": [t.isoformat(timespec="seconds") for t in stamps],
     }
@@ -512,6 +590,9 @@ def main(argv=None) -> int:
     if not res.get("ok"):
         print("replay failed:", res.get("error"))
         return 1
+    missed = {k: v for k, v in (res.get("cache_misses") or {}).items() if v}
+    if missed:
+        print(f"  [warn] the candles fetched do not cover every key the engine read: {missed}")
     logged = recorded_picks(res["session"])
     if not args.no_export:
         fp = args.export or os.path.join(LOGS, "replay", f"frames_{res['session']}.json")
