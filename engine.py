@@ -27,6 +27,19 @@ from datetime import datetime, timedelta, timezone
 from sources import market_status, session_date
 from upstox_client import IST, UpstoxError, parse_ts
 
+# ------------------------------------------------------------------ clock ----
+# The engine normally uses wall-clock time. A REPLAY over a past session needs it
+# to believe "now" is the minute being replayed, otherwise the RVOL pace, the
+# turnover projection and the session phase would all be computed for the wrong
+# moment. replay.py sets REPLAY_NOW for the duration of a run.
+REPLAY_NOW = None
+
+
+def now_ist() -> datetime:
+    """Current IST time — or the replay clock while a replay is running."""
+    return REPLAY_NOW or datetime.now(IST)
+
+
 # ----------------------------------------------------------------- tunables ---
 DEFAULTS = {
     "refresh_sec": 20,            # snapshot poll interval
@@ -170,7 +183,7 @@ class Engine:
         self.state_meta = {
             "cycle": 0, "last_poll": None, "last_deep": None, "last_update_iso": None,
             "warm_done": False, "warm_total": len(self.stocks), "warm_done_count": 0,
-            "deep_scanned": 0, "errors": [], "started": datetime.now(IST).isoformat(timespec="seconds"),
+            "deep_scanned": 0, "errors": [], "started": now_ist().isoformat(timespec="seconds"),
             "poll_seconds": None,
         }
         self.picks = {"long": [], "short": []}
@@ -275,7 +288,7 @@ class Engine:
         if len(rows) < 5:
             return
         last_dt = parse_ts(rows[-1][0])
-        now = datetime.now(IST)
+        now = now_ist()
         today = now.date()
         in_session = (now.hour * 60 + now.minute) < (15 * 60 + 40)
         hist = rows
@@ -339,7 +352,7 @@ class Engine:
         self._final_score_all()
         self._select_picks()
         self.state_meta["cycle"] += 1
-        self.state_meta["last_poll"] = datetime.now(IST).isoformat(timespec="seconds")
+        self.state_meta["last_poll"] = now_ist().isoformat(timespec="seconds")
         self.state_meta["last_update_iso"] = self.state_meta["last_poll"]
         if do_deep:
             self.state_meta["last_deep"] = self.state_meta["last_poll"]
@@ -691,7 +704,7 @@ class Engine:
     # -------------------------------------------------------- hard gates & score
     def session_phase(self, now=None) -> dict:
         """Which part of the trading day are we in, and can you open a trade?"""
-        now = now or datetime.now(IST)
+        now = now or now_ist()
         mins = (now.hour * 60 + now.minute) - (9 * 60 + 15)
         for i, (a, b, key, verdict, note) in enumerate(SESSION_PHASES):
             if a <= mins < b:
@@ -761,7 +774,7 @@ class Engine:
         return {"verdict": verdict, "reason": reason, "checks": checks}
 
     def _pace_fraction(self) -> float:
-        now = datetime.now(IST)
+        now = now_ist()
         mins = (now.hour * 60 + now.minute) - (9 * 60 + 15)
         if mins < 0:
             mins = 375          # market not open yet -> use full-day lens
@@ -1126,7 +1139,7 @@ class Engine:
         ltp = st["ltp"]
         key = f"{st['symbol']}-{side}"
         rec = self.pick_log.get(key)
-        now = datetime.now(IST)
+        now = now_ist()
         if rec is None:
             rec = {"symbol": st["symbol"], "side": side, "first_seen": now.isoformat(timespec="seconds"),
                    "first_price": ltp, "entry": trade["entry"], "sl": trade["sl"],
@@ -1198,7 +1211,7 @@ class Engine:
         }
 
     def _track_and_log(self, picks):
-        day = datetime.now(IST).date().isoformat()
+        day = now_ist().date().isoformat()
         path = os.path.join(self.log_dir, f"picks_{day}.csv")
         new = not os.path.exists(path)
         try:
@@ -1211,7 +1224,7 @@ class Engine:
                     if rec and not rec["logged"]:
                         rec["logged"] = True
                         lv = p["levels"]
-                        f.write(f"{datetime.now(IST).isoformat(timespec='seconds')},{p['symbol']},"
+                        f.write(f"{now_ist().isoformat(timespec='seconds')},{p['symbol']},"
                                 f"{p['direction']},{p['score']},{p['ltp']},{lv['entry']},{lv['sl']},"
                                 f"{lv['t1']},{lv['t2']},{lv['rr']},{p['status']},"
                                 f"\"{lv['mode']}\",{p.get('fut_symbol')}\n")
@@ -1268,7 +1281,7 @@ class Engine:
             return {
                 "ok": True,
                 "mode": "demo" if self.demo else "live",
-                "server_time_ist": datetime.now(IST).isoformat(timespec="seconds"),
+                "server_time_ist": now_ist().isoformat(timespec="seconds"),
                 "context": self.ctx,
                 "funnel": self.funnel,
                 "phase": self.session_phase(),
