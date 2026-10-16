@@ -130,6 +130,10 @@
   input[type=text],input[type=number],input[type=password],textarea{background:var(--bg2);border:1px solid var(--line);
     color:var(--txt);border-radius:9px;padding:8px 10px;font:inherit;width:100%}
   .tbar input[type=text]{max-width:260px}
+  /* one header row per table: title on the left, that side's filters on the right */
+  .tblhead{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+  .tblhead h2{margin:0}
+  .tblhead .fgrp{margin-left:auto}
   /* filter groups on the All F&O Stocks toolbar */
   .fgrp{display:inline-flex;align-items:center;gap:6px;padding:4px 9px;border:1px solid var(--line);
     border-radius:9px;background:var(--card);font-size:12.5px;white-space:nowrap;transition:border-color .15s}
@@ -146,7 +150,7 @@
   th:hover{color:var(--txt)}
   tbody tr:hover{background:#161f31}
   .tblwrap{max-height:70vh;overflow:auto;border:1px solid var(--line);border-radius:var(--r);background:var(--card)}
-  .sch{display:inline-block;min-width:34px;padding:2px 6px;border-radius:6px;font-weight:700;font-size:11.5px}
+  .sch{display:inline-block;min-width:42px;padding:2px 6px;border-radius:6px;font-weight:700;font-size:11.5px}
   .sch.hi{background:#0f3d26;color:#4ade80} .sch.md{background:#2c2a12;color:#fcd34d}
   .sch.lo{background:#1c2333;color:var(--dim)}
   .sch.hir{background:#43181b;color:#fca5a5}
@@ -277,26 +281,49 @@
       <input type="text" id="q" placeholder="Search symbol or sector…"/>
       <span class="fgrp" id="fgRvol"><span class="dim">RVOL ≥</span>
         <input type="number" id="fRvol" min="0" step="0.1" placeholder="any"></span>
-      <span class="fgrp" id="fgLong"><b class="up">▲ LONG</b><span class="dim">≥</span>
-        <input type="number" id="fLongMin" min="0" max="100" step="1" placeholder="any">
-        <span class="dim">· Short ≤</span>
-        <input type="number" id="fShortMax" min="0" max="100" step="1" placeholder="any"></span>
-      <span class="fgrp" id="fgShort"><b class="dn">▼ SHORT</b><span class="dim">≥</span>
-        <input type="number" id="fShortMin" min="0" max="100" step="1" placeholder="any">
-        <span class="dim">· Long ≤</span>
-        <input type="number" id="fLongMax" min="0" max="100" step="1" placeholder="any"></span>
       <button class="mini" id="fReset">reset filters</button>
     </div>
-    <div class="tblwrap">
-      <table id="tbl">
-        <thead><tr>
-          <th data-k="symbol">Symbol</th><th data-k="sector">Sector</th><th data-k="ltp">LTP</th>
-          <th data-k="pct_chg">Chg %</th><th data-k="rvol">RVOL</th><th data-k="oi_chg">OI Δ%</th>
-          <th data-k="turnover_cr">Turnover ₹cr</th><th data-k="atr_pct">ATR%</th>
-          <th data-k="score_long">Long</th><th data-k="score_short">Short</th>
-        </tr></thead>
-        <tbody></tbody>
-      </table>
+
+    <div class="sect">
+      <div class="tblhead">
+        <h2>▲ Long setups <span class="cnt">strongest long side · score ≥ 50</span></h2>
+        <span class="fgrp" id="fgLong"><b class="up">▲ LONG</b><span class="dim">≥</span>
+          <input type="number" id="fLongMin" min="0" max="100" step="1" placeholder="any">
+          <span class="dim">· Short ≤</span>
+          <input type="number" id="fShortMax" min="0" max="100" step="1" placeholder="any"></span>
+      </div>
+      <div class="tblwrap">
+        <table id="tblLong">
+          <thead><tr>
+            <th data-k="symbol">Symbol</th><th data-k="sector">Sector</th><th data-k="ltp">LTP</th>
+            <th data-k="pct_chg">Chg %</th><th data-k="rvol">RVOL</th><th data-k="oi_chg">OI Δ%</th>
+            <th data-k="turnover_cr">Turnover ₹cr</th><th data-k="atr_pct">ATR%</th>
+            <th data-k="score_long">Long</th><th data-k="score_short">Short</th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="sect">
+      <div class="tblhead">
+        <h2>▼ Short setups <span class="cnt">strongest short side · score ≥ 50</span></h2>
+        <span class="fgrp" id="fgShort"><b class="dn">▼ SHORT</b><span class="dim">≥</span>
+          <input type="number" id="fShortMin" min="0" max="100" step="1" placeholder="any">
+          <span class="dim">· Long ≤</span>
+          <input type="number" id="fLongMax" min="0" max="100" step="1" placeholder="any"></span>
+      </div>
+      <div class="tblwrap">
+        <table id="tblShort">
+          <thead><tr>
+            <th data-k="symbol">Symbol</th><th data-k="sector">Sector</th><th data-k="ltp">LTP</th>
+            <th data-k="pct_chg">Chg %</th><th data-k="rvol">RVOL</th><th data-k="oi_chg">OI Δ%</th>
+            <th data-k="turnover_cr">Turnover ₹cr</th><th data-k="atr_pct">ATR%</th>
+            <th data-k="score_long">Long</th><th data-k="score_short">Short</th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
     </div>
   </div>
 
@@ -398,7 +425,12 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const S = {data:null, sortK:'score_long', sortDir:-1, timer:null, countdown:0};
+const S = {data:null, timer:null, countdown:0,
+  /* each table sorts independently */
+  sort:{long:{k:'score_long',dir:-1}, short:{k:'score_short',dir:-1}}};
+/* A stock only appears once its stronger side scores at least this much, so the
+   two tables always show genuine one-sided setups rather than noise. */
+const SIDE_FLOOR = 50;
 const $ = id => document.getElementById(id);
 const fmt = (n,d=2) => (n===null||n===undefined||isNaN(n)) ? '—'
   : Number(n).toLocaleString('en-IN',{minimumFractionDigits:d,maximumFractionDigits:d});
@@ -522,33 +554,39 @@ function fillSettings(){
 }
 
 
-/* ---------------- table ---------------- */
-function renderTable(rows){
-  const q=$('q').value.trim().toLowerCase();
-  const num = id => { const v=$(id).value.trim(); return v==='' ? null : Number(v); };
-  const rvMin=num('fRvol'), lMin=num('fLongMin'), sMax=num('fShortMax'),
-        sMin=num('fShortMin'), lMax=num('fLongMax');
-  /* a LONG filter needs Long ≥ a (and optionally Short ≤ b); SHORT is the mirror.
-     blank boxes are "no constraint", so a group only applies once you type in it. */
-  const longOn = lMin!==null || sMax!==null, shortOn = sMin!==null || lMax!==null;
+/* ---------------- tables ---------------- */
+const tableNum = id => { const v=$(id).value.trim(); return v==='' ? null : Number(v); };
+
+function renderSide(rows, side){
+  const isLong = side==='long';
+  const q = $('q').value.trim().toLowerCase(), rvMin = tableNum('fRvol');
+  const minA = tableNum(isLong?'fLongMin' :'fShortMin');   /* this side's score >= */
+  const maxB = tableNum(isLong?'fShortMax':'fLongMax');    /* the other side   <= */
   $('fgRvol').classList.toggle('on', rvMin!==null);
-  $('fgLong').classList.toggle('on', longOn);
-  $('fgShort').classList.toggle('on', shortOn);
-  let rs = rows.filter(r=>{
+  $(isLong?'fgLong':'fgShort').classList.toggle('on', minA!==null || maxB!==null);
+
+  const rs = rows.filter(r=>{
+    const a = (isLong? r.score_long : r.score_short) ?? 0;   /* this side  */
+    const b = (isLong? r.score_short: r.score_long ) ?? 0;   /* other side */
+    if(a < SIDE_FLOOR) return false;                         /* below the shared floor */
+    if(isLong ? !(a > b) : !(a >= b)) return false;           /* belongs to the other table */
     if(q && !(r.symbol.toLowerCase().includes(q)||(r.sector||'').toLowerCase().includes(q))) return false;
     if(rvMin!==null && (r.rvol??0) < rvMin) return false;
-    if(!longOn && !shortOn) return true;
-    const L=r.score_long??0, S=r.score_short??0;
-    const matchLong  = longOn  && (lMin===null||L>=lMin) && (sMax===null||S<=sMax);
-    const matchShort = shortOn && (sMin===null||S>=sMin) && (lMax===null||L<=lMax);
-    return matchLong || matchShort;   /* either setup */
+    if(minA!==null && a < minA) return false;
+    if(maxB!==null && b > maxB) return false;
+    return true;
   });
-  const k=S.sortK, d=S.sortDir;
-  rs.sort((a,b)=>{const A=a[k]??-1e9,B=b[k]??-1e9;
-    return (typeof A==='string')? d*A.localeCompare(B) : d*(A-B);});
+
+  const st = S.sort[side];
+  rs.sort((x,y)=>{const A=x[st.k]??-1e9, B=y[st.k]??-1e9;
+    return (typeof A==='string')? st.dir*A.localeCompare(B) : st.dir*(A-B);});
+
   const sch=(v,short)=>{ if(!v) return '<span class="sch lo">—</span>';
-    const c=v>=72?(short?'hir':'hi'):(v>=62?'md':'lo'); return `<span class="sch ${c}">${v.toFixed(0)}</span>`;};
-  $('tbl').querySelector('tbody').innerHTML = rs.map(r=>`<tr>
+    /* one decimal: two scores like 52.0 vs 51.8 would both read "52" when rounded,
+       which made marginal rows look like ties inside the Long/Short tables */
+    const c=v>=72?(short?'hir':'hi'):(v>=62?'md':'lo'); return `<span class="sch ${c}">${v.toFixed(1)}</span>`;};
+  const tbody = $(isLong?'tblLong':'tblShort').querySelector('tbody');
+  tbody.innerHTML = rs.length ? rs.map(r=>`<tr>
     <td><b>${r.symbol}</b>${r.deep?' <span class="dim2" title="1-min analysed">•</span>':''}</td>
     <td class="dim">${r.sector}</td>
     <td>${fmt(r.ltp)}</td>
@@ -558,11 +596,22 @@ function renderTable(rows){
     <td>${fmt(r.turnover_cr,0)}</td>
     <td>${fmt(r.atr_pct,1)}%</td>
     <td>${sch(r.score_long,false)}</td>
-    <td>${sch(r.score_short,true)}</td></tr>`).join('');
+    <td>${sch(r.score_short,true)}</td></tr>`).join('')
+  : `<tr><td colspan="10" style="text-align:center;color:var(--dim);padding:18px">
+      ${isLong?'No long setup clears the bar right now.':'No short setup clears the bar right now.'}
+      <br><span style="font-size:11.5px">Clear the boxes above to see more.</span></td></tr>`;
 }
-document.querySelectorAll('#tbl th').forEach(th=>th.onclick=()=>{
-  const k=th.dataset.k; if(S.sortK===k) S.sortDir*=-1; else {S.sortK=k;S.sortDir=-1;}
-  renderTable(S.data.universe);
+
+function renderTable(rows){
+  renderSide(rows,'long');
+  renderSide(rows,'short');
+}
+[['tblLong','long'],['tblShort','short']].forEach(([tid,side])=>{
+  document.querySelectorAll('#'+tid+' th').forEach(th=>th.onclick=()=>{
+    const k=th.dataset.k, st=S.sort[side];
+    if(st.k===k) st.dir*=-1; else {st.k=k; st.dir=-1;}
+    if(S.data) renderTable(S.data.universe);
+  });
 });
 ['q','fRvol','fLongMin','fShortMax','fShortMin','fLongMax']
   .forEach(id=>$(id).addEventListener('input',()=>S.data&&renderTable(S.data.universe)));
