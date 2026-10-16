@@ -15,6 +15,7 @@ Endpoints
 """
 from __future__ import annotations
 
+import glob
 import hashlib
 import hmac
 import json
@@ -258,6 +259,28 @@ def auth_status(host_header: str = "") -> dict:
 
 
 # ------------------------------------------------------------------------ API
+REPLAY_MISSING_PAGE = b"""<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Session replay \u00b7 F&amp;O screener</title>
+<style>body{margin:0;background:#070a10;color:#e9eefb;
+ font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+ .w{max-width:720px;margin:0 auto;padding:56px 20px}a{color:#4c8dff;text-decoration:none}
+ code{background:#131b28;border:1px solid rgba(148,170,210,.18);border-radius:6px;padding:2px 7px;
+ font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px}
+ h1{font-size:19px;margin:0 0 6px}p{color:#8a97b4}
+ pre{background:#0e141f;border:1px solid rgba(148,170,210,.10);border-radius:12px;padding:14px 16px;
+ overflow:auto;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;color:#c3cede}</style>
+</head><body><div class="w">
+<h1>No session replay built yet</h1>
+<p>The replay walks a finished session through the real scoring engine and writes one
+filterable page per session. Build it once with a working Upstox token:</p>
+<pre>python3 replay.py --session 2026-10-16
+python3 replay_report.py</pre>
+<p>Then reload this page. The report is static: nothing here touches the live screen or the API.</p>
+<p><a href="/">\u2190 back to the live screen</a></p>
+</div></body></html>"""
+
+
 def ui_version() -> str:
     """Short hash of the current index.html — changes whenever the UI changes."""
     try:
@@ -473,6 +496,22 @@ class Handler(BaseHTTPRequestHandler):
         except (BrokenPipeError, ConnectionResetError):
             pass
 
+    def _serve_replay(self):
+        """Serve the newest session-replay report built by replay_report.py.
+
+        It is a single self-contained HTML file (no assets, no API calls), so it
+        is served straight off disk and can never interfere with the live screen.
+        """
+        reports = glob.glob(os.path.join(BASE, "logs", "replay", "report_*.html"))
+        if not reports:
+            return self._send(REPLAY_MISSING_PAGE, 200, "text/html")
+        newest = max(reports, key=os.path.getmtime)
+        try:
+            with open(newest, "rb") as f:
+                return self._send(f.read(), 200, "text/html")
+        except OSError:
+            return self._send(REPLAY_MISSING_PAGE, 200, "text/html")
+
     def _host(self) -> str:
         return (self.headers.get("X-Forwarded-Host") or self.headers.get("Host") or "").strip()
 
@@ -509,6 +548,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(body, 200, "text/html")
             except OSError:
                 return self._send({"ok": False, "error": "index.html missing"}, 500)
+        if path == "/replay":
+            return self._serve_replay()
         if path == "/api/snapshot":
             obj, status = api_snapshot(self._host()), 200
             return self._send(obj, status)
