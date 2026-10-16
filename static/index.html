@@ -138,8 +138,6 @@
   th:hover{color:var(--txt)}
   tbody tr:hover{background:#161f31}
   .tblwrap{max-height:70vh;overflow:auto;border:1px solid var(--line);border-radius:var(--r);background:var(--card)}
-  .g-pass{color:#4ade80} .g-illiquid,.g-low-volatility,.g-wide-spread,.g-price-floor{color:var(--dim2)}
-  .g-ban-list{color:#fca5a5}
   .sch{display:inline-block;min-width:34px;padding:2px 6px;border-radius:6px;font-weight:700;font-size:11.5px}
   .sch.hi{background:#0f3d26;color:#4ade80} .sch.md{background:#2c2a12;color:#fcd34d}
   .sch.lo{background:#1c2333;color:var(--dim)}
@@ -276,7 +274,7 @@
           <th data-k="symbol">Symbol</th><th data-k="sector">Sector</th><th data-k="ltp">LTP</th>
           <th data-k="pct_chg">Chg %</th><th data-k="rvol">RVOL</th><th data-k="oi_chg">OI Δ%</th>
           <th data-k="turnover_cr">Turnover ₹cr</th><th data-k="atr_pct">ATR%</th>
-          <th data-k="score_long">Long</th><th data-k="score_short">Short</th><th data-k="gate">Gate</th>
+          <th data-k="score_long">Long</th><th data-k="score_short">Short</th>
         </tr></thead>
         <tbody></tbody>
       </table>
@@ -525,8 +523,7 @@ function renderTable(rows){
     <td>${fmt(r.turnover_cr,0)}</td>
     <td>${fmt(r.atr_pct,1)}%</td>
     <td>${sch(r.score_long,false)}</td>
-    <td>${sch(r.score_short,true)}</td>
-    <td class="g-${r.gate}">${r.gate}</td></tr>`).join('');
+    <td>${sch(r.score_short,true)}</td></tr>`).join('');
 }
 document.querySelectorAll('#tbl th').forEach(th=>th.onclick=()=>{
   const k=th.dataset.k; if(S.sortK===k) S.sortDir*=-1; else {S.sortK=k;S.sortDir=-1;}
